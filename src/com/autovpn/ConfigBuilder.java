@@ -45,7 +45,10 @@ public final class ConfigBuilder {
         String def = groups.contains(opt.initialGroup) ? opt.initialGroup : (String) groups.get(0);
 
         List<Object> outbounds = new ArrayList<>();
-        outbounds.add(Json.obj("type", "selector", "tag", SELECTOR, "outbounds", groups, "default", def,
+        List<Object> selectable = new ArrayList<>(groups);
+        selectable.addAll(regular);
+        selectable.addAll(lte);
+        outbounds.add(Json.obj("type", "selector", "tag", SELECTOR, "outbounds", selectable, "default", def,
                 "interrupt_exist_connections", true));
         if (!regular.isEmpty()) outbounds.add(urltest(GROUP_REGULAR, regular));
         if (!lte.isEmpty()) outbounds.add(urltest(GROUP_LTE, lte));

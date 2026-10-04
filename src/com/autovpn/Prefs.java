@@ -39,6 +39,10 @@ public final class Prefs {
         p.edit().putStringSet("excluded_apps", new java.util.HashSet<>(v)).apply();
     }
 
+    /** Name of the server chosen by hand, empty = automatic. */
+    public String pinned() { return p.getString("pinned", ""); }
+    public void pinned(String v) { p.edit().putString("pinned", v).apply(); }
+
     public String hwid() { return p.getString("hwid", ""); }
     public void hwid(String v) { p.edit().putString("hwid", v).apply(); }
 

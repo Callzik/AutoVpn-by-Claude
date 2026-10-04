@@ -46,6 +46,10 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".ServersActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".AppsActivity"
             android:exported="false"
             android:screenOrientation="portrait"

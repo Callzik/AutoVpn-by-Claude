@@ -186,6 +186,11 @@ public class MainActivity extends Activity {
         srvBadge = Ui.badge(c);
         srvRow.addView(srvBadge);
         srv.addView(srvRow);
+        srv.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, ServersActivity.class)); }
+        });
+        TextView srvHint = Ui.text(c, "Все серверы и пинг  ›", 13, Ui.ACCENT, false);
+        srv.addView(srvHint, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
         col.addView(srv, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
 
         // routing
@@ -274,10 +279,11 @@ public class MainActivity extends Activity {
         if (s == AppState.ON && !AppState.serverName.isEmpty()) {
             srvName.setText(AppState.serverName);
             String ping = AppState.ping > 0 ? AppState.ping + " мс" : "пинг —";
-            srvSub.setText("Лучший из " + AppState.alive + " · " + ping + " · " + ("auto-lte".equals(AppState.group) ? "LTE" : "обычные"));
+            boolean manual = !AppState.pinned.isEmpty();
+            srvSub.setText((manual ? "Выбран вручную" : "Лучший из " + AppState.alive) + " · " + ping + " · " + ("auto-lte".equals(AppState.group) ? "LTE" : "обычные"));
             srvBadge.setVisibility(View.VISIBLE);
-            srvBadge.setText(AppState.switching ? "Проверка…" : "Авто");
-            Ui.tone(this, srvBadge, AppState.switching ? Ui.TONE_NEUTRAL : Ui.TONE_OK);
+            srvBadge.setText(AppState.switching ? "Проверка…" : manual ? "Вручную" : "Авто");
+            Ui.tone(this, srvBadge, AppState.switching ? Ui.TONE_NEUTRAL : manual ? Ui.TONE_WARN : Ui.TONE_OK);
         } else if (s == AppState.CONNECTING) {
             srvName.setText("Выбираю сервер…");
             srvSub.setText(AppState.lastServers);

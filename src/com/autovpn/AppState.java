@@ -35,6 +35,12 @@ public final class AppState {
     public static volatile String banner = "";
     public static volatile int bannerTone;           // 1 ok, 2 warn
     public static volatile long bannerAt;
+    /** Name of the server chosen by hand, empty = automatic. */
+    public static volatile String pinned = "";
+    public static volatile List<Server> servers = new ArrayList<>();
+    /** tag → last measured delay in ms, -1 = did not answer. */
+    public static final java.util.concurrent.ConcurrentHashMap<String, Integer> pings = new java.util.concurrent.ConcurrentHashMap<>();
+    public static volatile boolean pinging;
     public static volatile String lastServers = "";  // summary for settings
 
     private static final List<Runnable> listeners = new CopyOnWriteArrayList<>();

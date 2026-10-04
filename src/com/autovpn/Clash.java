@@ -131,6 +131,34 @@ public final class Clash {
         return new HashMap<>(m);
     }
 
+    public interface Listener { void onResult(String tag, int delay); }
+
+    /** Tests the given outbounds in parallel, reporting each result as it arrives (-1 = no answer). */
+    public void testTags(List<String> tags, final int timeoutMs, final Listener l) {
+        if (tags.isEmpty()) return;
+        ExecutorService pool = Executors.newFixedThreadPool(Math.min(tags.size(), 48));
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (final String tag : tags) {
+                fs.add(pool.submit(new Runnable() {
+                    @Override public void run() {
+                        int d = -1;
+                        try {
+                            d = proxyDelay(tag, ConfigBuilder.TEST_URL, timeoutMs);
+                        } catch (Exception ignored) {
+                        }
+                        l.onResult(tag, d > 0 ? d : -1);
+                    }
+                }));
+            }
+            for (Future<?> f : fs) {
+                try { f.get(timeoutMs + 10000, TimeUnit.MILLISECONDS); } catch (Exception ignored) { }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     /**
      * Makes the urltest group re-test all members and re-select. Returns an empty map when the group
      * was already checking (its own check then re-selects when it finishes).

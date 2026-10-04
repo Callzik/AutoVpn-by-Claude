@@ -76,6 +76,7 @@ public class BoxVpnService extends VpnService {
     private final Map<String, Server> byTag = new HashMap<>();
     private boolean hasRegular, hasLte;
     private volatile String activeGroup = "";
+    static volatile BoxVpnService instance;
 
     /* ---------- lifecycle ---------- */
 
@@ -99,6 +100,7 @@ public class BoxVpnService extends VpnService {
 
     @Override
     public void onDestroy() {
+        instance = null;
         stopVpn(null);
         super.onDestroy();
     }
@@ -107,6 +109,7 @@ public class BoxVpnService extends VpnService {
         running = true;
         stopping = false;
         prefs = new Prefs(this);
+        instance = this;
         VpnControl.init(this);
         cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         exec = Executors.newSingleThreadScheduledExecutor();
@@ -266,6 +269,8 @@ public class BoxVpnService extends VpnService {
         }
         if (reg == 0 && lte == 0) throw new Exception("В подписке нет серверов, которые умеет ядро");
         servers = parsed;
+        AppState.servers = parsed;
+        AppState.pings.clear();
         byTag.clear();
         for (Server s : servers) byTag.put(s.tag, s);
         hasRegular = reg > 0;
@@ -330,6 +335,10 @@ public class BoxVpnService extends VpnService {
         } else {
             AppState.vpn = AppState.ON;
             AppState.since = System.currentTimeMillis();
+            String pn = prefs.pinned();
+            if (!pn.isEmpty()) {
+                if (!applyPin(pn)) prefs.pinned("");
+            }
         }
         refreshStatus();
         AppState.changed();
@@ -365,6 +374,11 @@ public class BoxVpnService extends VpnService {
 
     private void watch() throws Exception {
         if (!running || clash == null || AppState.vpn != AppState.ON || AppState.switching) return;
+        String pt = pinnedTag();
+        if (pt != null) {
+            watchPinned(pt);
+            return;
+        }
         String group = activeGroup;
         String tag = clash.now(group);
         if (tag.isEmpty()) return;
@@ -401,6 +415,106 @@ public class BoxVpnService extends VpnService {
             Server n = byTag.get(now);
             AppState.banner("Сервер перестал отвечать — переключено на " + (n != null ? n.name : now), 2);
         }
+    }
+
+    /* ---------- manual server choice ---------- */
+
+    private String pinnedTag() {
+        try {
+            String sel = clash == null ? "" : clash.now(ConfigBuilder.SELECTOR);
+            return byTag.containsKey(sel) ? sel : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void watchPinned(String tag) throws Exception {
+        int d = clash.proxyDelay(tag, ConfigBuilder.TEST_URL, 5000);
+        if (d > 0) {
+            deadCount = 0;
+            AppState.ping = d;
+            AppState.changed();
+            return;
+        }
+        deadCount++;
+        Server s = byTag.get(tag);
+        AppState.log("Выбранный сервер " + (s != null ? s.name : tag) + " не ответил (" + deadCount + ")");
+        if (deadCount < 2) return;
+        deadCount = 0;
+        prefs.pinned("");
+        ensureWorkingGroup(desiredGroup(), false);
+        refreshStatus();
+        AppState.banner("Выбранный сервер не отвечает — вернулся автовыбор", 2);
+    }
+
+    /** Selects a server by name; false when there is no such server. */
+    private boolean applyPin(String name) throws Exception {
+        for (Server s : servers) {
+            if (s.group != Server.EXCLUDED && s.name.equals(name)) {
+                clash.select(ConfigBuilder.SELECTOR, s.tag);
+                deadCount = 0;
+                AppState.log("Сервер выбран вручную: " + s.name);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** name = "" returns to automatic choice. Called from the servers screen. */
+    public void pin(final String name) {
+        if (!running || exec == null || exec.isShutdown() || clash == null) return;
+        prefs.pinned(name);
+        exec.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (AppState.vpn == AppState.OFF || AppState.vpn == AppState.CONNECTING) return;
+                    AppState.switching = true;
+                    AppState.changed();
+                    if (name.isEmpty()) {
+                        AppState.log("Возврат к автовыбору");
+                        if (ensureWorkingGroup(desiredGroup(), false) == null) {
+                            AppState.vpn = AppState.WAITING;
+                            AppState.phase = "Ни один сервер не отвечает. Повторю автоматически";
+                            scheduleReevaluate("retry", 15000);
+                        }
+                    } else if (!applyPin(name)) {
+                        prefs.pinned("");
+                    }
+                    AppState.switching = false;
+                    refreshStatus();
+                } catch (Throwable t) {
+                    AppState.switching = false;
+                    AppState.log("Не удалось выбрать сервер: " + t.getMessage());
+                    AppState.changed();
+                }
+            }
+        });
+    }
+
+    /** Measures every server through itself (the VPN must be on). */
+    public void pingAll() {
+        if (!running || clash == null || AppState.pinging) return;
+        AppState.pinging = true;
+        AppState.changed();
+        final Clash c = clash;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    List<String> tags = new ArrayList<>();
+                    for (Server s : servers) if (s.group != Server.EXCLUDED) tags.add(s.tag);
+                    AppState.pings.clear();
+                    c.testTags(tags, 5000, new Clash.Listener() {
+                        @Override public void onResult(String tag, int delay) {
+                            AppState.pings.put(tag, delay);
+                            AppState.changed();
+                        }
+                    });
+                } finally {
+                    AppState.pinging = false;
+                    AppState.changed();
+                }
+            }
+        }, "ping-all").start();
     }
 
     /* ---------- subscription auto-update ---------- */
@@ -567,6 +681,14 @@ public class BoxVpnService extends VpnService {
             }
             return;
         }
+        if (pinnedTag() != null) {
+            if (AppState.vpn == AppState.WAITING) {
+                AppState.vpn = AppState.ON;
+                AppState.since = System.currentTimeMillis();
+            }
+            refreshStatus();
+            return;
+        }
         String want = desiredGroup();
         String prevServer = AppState.serverName;
         boolean wasWaiting = AppState.vpn == AppState.WAITING;
@@ -627,7 +749,16 @@ public class BoxVpnService extends VpnService {
         if (clash == null) return;
         String group = clash.now(ConfigBuilder.SELECTOR);
         if (group.isEmpty()) return;
-        String tag = clash.now(group);
+        String tag;
+        Server picked = byTag.get(group);
+        if (picked != null) {
+            tag = group;
+            group = picked.group == Server.LTE ? ConfigBuilder.GROUP_LTE : ConfigBuilder.GROUP_REGULAR;
+            AppState.pinned = picked.name;
+        } else {
+            tag = clash.now(group);
+            AppState.pinned = "";
+        }
         Server s = byTag.get(tag);
         AppState.group = group;
         AppState.serverName = s != null ? s.name : tag;
