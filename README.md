@@ -9,3 +9,7 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 - subscriptions: share links (vless, vmess, trojan, ss, hy2) and Xray/sing-box JSON
 
 `helper/main.go` goes into `cmd/sbhelper` of sing-box 1.12 and is built for android/arm64; the binary is packaged as `lib/arm64-v8a/libsbhelper.so`. `build.sh` builds the APK without Gradle (aapt2, javac, dx, apksigner). Releases contain the signed APK.
+
+## О проекте
+
+Проект создан с помощью Claude (Anthropic), ИИ-ассистента: код, сборка и отладка выполнены в диалоге с ним.
