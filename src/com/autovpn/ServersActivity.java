@@ -22,6 +22,7 @@ public class ServersActivity extends Activity {
     private final List<Server> items = new ArrayList<>();
     private Adapter adapter;
     private TextView test, hint;
+    private boolean manySubs;
     private final Runnable refresh = new Runnable() {
         @Override public void run() { update(); }
     };
@@ -98,13 +99,18 @@ public class ServersActivity extends Activity {
         List<Server> src = AppState.servers;
         if (src == null || src.isEmpty()) {
             try {
-                src = SubParser.parse(prefs.subCache(), new ArrayList<String>());
+                src = Subs.merge(Subs.cached(prefs), new ArrayList<String>(), new ArrayList<String>());
             } catch (Exception e) {
                 src = new ArrayList<>();
             }
         }
         items.clear();
-        for (Server s : src) if (s.group != Server.EXCLUDED) items.add(s);
+        java.util.Set<String> subs = new java.util.HashSet<>();
+        for (Server s : src) {
+            if (s.group != Server.EXCLUDED) items.add(s);
+            subs.add(s.sub);
+        }
+        manySubs = subs.size() > 1;
         Collections.sort(items, new Comparator<Server>() {
             @Override public int compare(Server a, Server b) {
                 if (a.group != b.group) return a.group - b.group;
@@ -166,7 +172,8 @@ public class ServersActivity extends Activity {
             }
             final Server s = items.get(pos - 1);
             name.setText(s.name);
-            sub.setText(s.group == Server.LTE ? "LTE / белые списки" : "обычный");
+            sub.setText((s.group == Server.LTE ? "LTE / белые списки" : "обычный") + (manySubs && !s.sub.isEmpty() ? " · " + s.sub : ""));
+            sub.setSingleLine(true);
             int p = ping(s);
             if (AppState.pinned.equals(s.name) || pinned.equals(s.name)) {
                 right.setText((p > 0 ? p + " мс  " : "") + "✓");

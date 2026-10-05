@@ -24,6 +24,7 @@ public class SettingsActivity extends Activity {
     private Prefs prefs;
     private TextView modeWl, modeNet, modeHint, logView, appsCount;
     private EditText subInput;
+    private LinearLayout subList;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -56,42 +57,70 @@ public class SettingsActivity extends Activity {
         top.addView(ver, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         col.addView(top);
 
-        // Subscription
-        col.addView(section(c, "Подписка"));
+        // Subscriptions
+        col.addView(section(c, "Подписки"));
         LinearLayout sub = Ui.card(c);
+        subList = new LinearLayout(c);
+        subList.setOrientation(LinearLayout.VERTICAL);
+        sub.addView(subList);
+        renderSubs();
+
         subInput = new EditText(c);
-        subInput.setText(prefs.subUrl());
         subInput.setTextColor(Ui.FG);
         subInput.setHintTextColor(0xFF8A919C);
-        subInput.setHint("https://… или vless://…");
+        subInput.setHint("Ещё одна ссылка: https://… или vless://…");
         subInput.setTypeface(Typeface.MONOSPACE);
         subInput.setTextSize(13);
         subInput.setMaxLines(3);
         subInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         subInput.setBackground(Ui.round(c, Ui.SURFACE2, 12, 0));
         subInput.setPadding(Ui.dp(c, 12), Ui.dp(c, 12), Ui.dp(c, 12), Ui.dp(c, 12));
-        sub.addView(subInput);
-        long upd = prefs.subUpdated();
-        String info = upd == 0 ? "Ещё не загружалась" : "Загружена " + android.text.format.DateFormat.format("dd.MM HH:mm", upd);
-        if (!AppState.lastServers.isEmpty()) info += "\n" + AppState.lastServers;
-        info += "\nПока VPN включён, подписка обновляется сама раз в 12 часов";
-        TextView subInfo = Ui.text(c, info, 13, Ui.MUTED, false);
-        sub.addView(subInfo, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
-        TextView save = Ui.button(c, "Сохранить и переподключить", false);
-        save.setOnClickListener(new View.OnClickListener() {
+        sub.addView(subInput, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
+
+        LinearLayout addRow = Ui.row(c);
+        TextView paste = Ui.button(c, "Вставить", false);
+        paste.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                ClipData d = cb.getPrimaryClip();
+                CharSequence t = d != null && d.getItemCount() > 0 ? d.getItemAt(0).coerceToText(SettingsActivity.this) : null;
+                if (t != null) subInput.setText(t.toString().trim());
+                else Toast.makeText(SettingsActivity.this, "Буфер обмена пуст", Toast.LENGTH_SHORT).show();
+            }
+        });
+        addRow.addView(paste, Ui.weight());
+        View gap = new View(c);
+        addRow.addView(gap, new LinearLayout.LayoutParams(Ui.dp(c, 8), 1));
+        TextView add = Ui.button(c, "Добавить", false);
+        add.setTextColor(Ui.ACCENT);
+        add.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 String val = subInput.getText().toString().trim();
                 if (!MainActivity.looksLikeLink(val)) {
                     Toast.makeText(SettingsActivity.this, "Это не похоже на ссылку на подписку", Toast.LENGTH_LONG).show();
                     return;
                 }
-                if (!val.equals(prefs.subUrl().trim())) {
-                    prefs.clearSubCache();
-                    prefs.pinned("");
-                    AppState.servers = new java.util.ArrayList<>();
-                    AppState.pings.clear();
+                if (!prefs.addSub(val)) {
+                    Toast.makeText(SettingsActivity.this, "Эта подписка уже добавлена", Toast.LENGTH_SHORT).show();
+                    return;
                 }
-                prefs.subUrl(val);
+                subInput.setText("");
+                subsChanged();
+            }
+        });
+        addRow.addView(add, Ui.weight());
+        sub.addView(addRow, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
+
+        long upd = prefs.subUpdated();
+        String info = upd == 0 ? "Ещё не загружались" : "Загружены " + android.text.format.DateFormat.format("dd.MM HH:mm", upd);
+        if (!AppState.lastServers.isEmpty()) info += "\n" + AppState.lastServers;
+        info += "\nСерверы всех подписок объединяются, автовыбор берёт лучший из всех. Пока VPN включён, подписки обновляются сами раз в 12 часов";
+        TextView subInfo = Ui.text(c, info, 13, Ui.MUTED, false);
+        sub.addView(subInfo, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
+        TextView save = Ui.button(c, "Обновить и переподключить", false);
+        save.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                prefs.resetSubUpdated();
                 reconnect();
             }
         });
@@ -196,12 +225,12 @@ public class SettingsActivity extends Activity {
     }
 
     private String serversText() {
-        String body = prefs.subCache();
-        String url = prefs.subUrl();
-        if (body.isEmpty() && !url.startsWith("http")) body = url;
-        if (body.isEmpty()) return "Подписка ещё не загружалась. Подключитесь один раз.";
+        List<Subs.Entry> entries = Subs.cached(prefs);
+        if (entries.isEmpty()) return "Подписка ещё не загружалась. Подключитесь один раз.";
         List<String> warnings = new ArrayList<>();
-        List<Server> list = SubParser.parse(body, warnings);
+        List<String> stubs = new ArrayList<>();
+        List<Server> list = Subs.merge(entries, warnings, stubs);
+        for (String st : stubs) warnings.add("заглушка вместо серверов — " + st);
         StringBuilder sb = new StringBuilder();
         String[] titles = {"Обычные", "LTE (для белых списков)", "Не участвуют"};
         for (int g = 0; g < 3; g++) {
@@ -211,6 +240,7 @@ public class SettingsActivity extends Activity {
                 if (s.group != g) continue;
                 n++;
                 part.append("  ").append(s.name);
+                if (entries.size() > 1) part.append("  [").append(s.sub).append(']');
                 if (s.excludeReason != null) part.append(" — ").append(s.excludeReason);
                 part.append('\n');
             }
@@ -219,6 +249,61 @@ public class SettingsActivity extends Activity {
         }
         for (String w : warnings) sb.append("\n⚠ ").append(w);
         return sb.toString().trim();
+    }
+
+    /** One row per subscription with a delete cross. */
+    private void renderSubs() {
+        Context c = this;
+        subList.removeAllViews();
+        List<String> urls = prefs.subUrls();
+        for (int i = 0; i < urls.size(); i++) {
+            final String url = urls.get(i);
+            if (i > 0) subList.addView(Ui.divider(c));
+            LinearLayout row = Ui.row(c);
+            LinearLayout text = new LinearLayout(c);
+            text.setOrientation(LinearLayout.VERTICAL);
+            TextView name = Ui.text(c, Subs.label(prefs, url), 15, Ui.FG, true);
+            name.setSingleLine(true);
+            text.addView(name);
+            TextView link = Ui.text(c, url, 12, Ui.MUTED, false);
+            link.setTypeface(Typeface.MONOSPACE);
+            link.setSingleLine(true);
+            link.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+            text.addView(link);
+            row.addView(text, Ui.weight());
+            TextView del = Ui.text(c, "✕", 18, Ui.MUTED, false);
+            del.setPadding(Ui.dp(c, 14), Ui.dp(c, 6), Ui.dp(c, 4), Ui.dp(c, 6));
+            del.setContentDescription("Удалить подписку");
+            del.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    if (prefs.subUrls().size() <= 1) {
+                        Toast.makeText(SettingsActivity.this, "Должна остаться хотя бы одна подписка", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    new android.app.AlertDialog.Builder(SettingsActivity.this)
+                            .setTitle("Удалить подписку?")
+                            .setMessage(Subs.label(prefs, url))
+                            .setPositiveButton("Удалить", new android.content.DialogInterface.OnClickListener() {
+                                @Override public void onClick(android.content.DialogInterface d, int w) {
+                                    prefs.removeSub(url);
+                                    subsChanged();
+                                }
+                            })
+                            .setNegativeButton("Отмена", null)
+                            .show();
+                }
+            });
+            row.addView(del);
+            subList.addView(row);
+        }
+    }
+
+    private void subsChanged() {
+        AppState.servers = new ArrayList<>();
+        AppState.pings.clear();
+        prefs.resetSubUpdated();
+        renderSubs();
+        reconnect();
     }
 
     private interface Toggle { void set(boolean v); }

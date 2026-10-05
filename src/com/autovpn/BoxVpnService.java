@@ -208,26 +208,23 @@ public class BoxVpnService extends VpnService {
         rulesDir = new File(getFilesDir(), "rules");
         copyRules(rulesDir);
 
-        // Subscription
-        String url = prefs.subUrl().trim();
-        if (url.isEmpty()) throw new Exception("Добавьте ссылку на подписку");
-        String body;
-        if (isHttp(url)) {
-            try {
-                body = fetchSub(url);
-                prefs.subCache(body);
-                AppState.log("Подписка загружена");
-            } catch (Exception e) {
-                if (e.getMessage() != null && e.getMessage().startsWith("Сервис подписки")) throw e;
-                AppState.log("Не удалось скачать подписку: " + e.getMessage());
-                body = prefs.subCache();
-                if (body.isEmpty()) throw new Exception("Не удалось скачать подписку. Проверьте ссылку и интернет");
-                AppState.log("Использую сохранённую копию подписки");
-            }
-        } else {
-            body = url; // a single key or a pasted list
+        // Subscriptions
+        List<String> urls = prefs.subUrls();
+        if (urls.isEmpty()) throw new Exception("Добавьте ссылку на подписку");
+        AppState.phase = urls.size() > 1 ? "Загружаю подписки (" + urls.size() + ")" : "Загружаю подписку";
+        AppState.changed();
+        List<Subs.Entry> entries = loadSubs(urls);
+        if (!running) return;
+        List<String> warnings = new ArrayList<>();
+        List<String> stubs = new ArrayList<>();
+        List<Server> merged = Subs.merge(entries, warnings, stubs);
+        for (String st : stubs) AppState.log("Вместо серверов заглушка — " + st);
+        if (merged.isEmpty()) {
+            if (!stubs.isEmpty()) throw new Exception("Сервис подписки вместо серверов прислал заглушку: " + stubs.get(0));
+            throw new Exception("Не удалось скачать подписку. Проверьте ссылку и интернет");
         }
-        applyServers(body);
+        prefs.markSubUpdated();
+        applyServers(merged, warnings);
         if (!running) return;
 
         // Network + white lists
@@ -239,7 +236,9 @@ public class BoxVpnService extends VpnService {
 
         startServer();
         startCore();
-        if (isHttp(url)) {
+        boolean anyHttp = false;
+        for (String u : urls) anyHttp |= Subs.isHttp(u);
+        if (anyHttp) {
             subTask = exec.scheduleWithFixedDelay(new Runnable() {
                 @Override public void run() { safeCheckSub(); }
             }, SUB_CHECK_EVERY_MIN, SUB_CHECK_EVERY_MIN, TimeUnit.MINUTES);
@@ -250,14 +249,70 @@ public class BoxVpnService extends VpnService {
         return url.startsWith("http://") || url.startsWith("https://");
     }
 
-    /** Downloads the subscription; throws when the panel answers with a stub instead of servers. */
-    private String fetchSub(String url) throws Exception {
-        String body = fetch(url);
-        String stub = stubReason(SubParser.parse(body, new ArrayList<String>()));
-        if (stub != null) {
-            throw new Exception("Сервис подписки вместо серверов прислал заглушку: «" + stub + "»");
+    /**
+     * Downloads all subscriptions at once. A link that fails (or answers with a stub while a good copy is saved)
+     * falls back to its saved copy, so one broken subscription never breaks the others.
+     */
+    private List<Subs.Entry> loadSubs(List<String> urls) {
+        final List<Subs.Entry> out = java.util.Collections.synchronizedList(new ArrayList<Subs.Entry>());
+        List<Thread> threads = new ArrayList<>();
+        for (final String url : urls) {
+            if (!Subs.isHttp(url)) {
+                Subs.Entry e = new Subs.Entry();
+                e.url = url;
+                e.name = Subs.label(prefs, url);
+                e.body = url; // a single key or a pasted list
+                out.add(e);
+                continue;
+            }
+            Thread t = new Thread(new Runnable() {
+                @Override public void run() {
+                    Subs.Entry e = new Subs.Entry();
+                    e.url = url;
+                    try {
+                        String[] title = new String[1];
+                        String body = fetch(url, title);
+                        if (title[0] != null && !title[0].isEmpty()) prefs.subName(url, title[0]);
+                        e.name = Subs.label(prefs, url);
+                        boolean stub = stubReason(SubParser.parse(body, new ArrayList<String>())) != null;
+                        String cache = prefs.subCache(url);
+                        if (stub && !cache.isEmpty()) {
+                            AppState.log(e.name + ": вместо серверов заглушка, беру сохранённую копию");
+                            body = cache;
+                        } else if (!stub) {
+                            prefs.subCache(url, body);
+                            AppState.log(e.name + ": подписка загружена");
+                        }
+                        e.body = body;
+                        out.add(e);
+                    } catch (Exception ex) {
+                        e.name = Subs.label(prefs, url);
+                        String cache = prefs.subCache(url);
+                        AppState.log(e.name + ": не удалось скачать (" + ex.getMessage() + ")"
+                                + (cache.isEmpty() ? "" : ", беру сохранённую копию"));
+                        if (!cache.isEmpty()) {
+                            e.body = cache;
+                            out.add(e);
+                        }
+                    }
+                }
+            }, "sub-fetch");
+            threads.add(t);
+            t.start();
         }
-        return body;
+        for (Thread t : threads) {
+            try {
+                t.join(30000);
+            } catch (InterruptedException ignored) {
+                break;
+            }
+        }
+        // keep the order the user added them in
+        List<Subs.Entry> sorted = new ArrayList<>();
+        synchronized (out) {
+            for (String u : urls) for (Subs.Entry e : out) if (e.url.equals(u)) { sorted.add(e); break; }
+        }
+        return sorted;
     }
 
     private static String signature(List<Server> list) {
@@ -266,11 +321,7 @@ public class BoxVpnService extends VpnService {
         return sb.toString();
     }
 
-    private void applyServers(String body) throws Exception {
-        List<String> warnings = new ArrayList<>();
-        List<Server> parsed = SubParser.parse(body, warnings);
-        String stub = stubReason(parsed);
-        if (stub != null) throw new Exception("В подписке нет настоящих серверов: «" + stub + "»");
+    private void applyServers(List<Server> parsed, List<String> warnings) throws Exception {
         for (String w : warnings) AppState.log(w);
         int reg = 0, lte = 0, ex = 0;
         for (Server s : parsed) {
@@ -287,7 +338,10 @@ public class BoxVpnService extends VpnService {
         hasRegular = reg > 0;
         hasLte = lte > 0;
         serversSig = signature(servers);
-        AppState.lastServers = "Серверов: " + servers.size() + " · обычных " + reg + ", LTE " + lte + ", не участвуют " + ex;
+        java.util.Set<String> subNames = new java.util.LinkedHashSet<>();
+        for (Server s : servers) subNames.add(s.sub);
+        AppState.lastServers = "Серверов: " + servers.size() + " · обычных " + reg + ", LTE " + lte + ", не участвуют " + ex
+                + (subNames.size() > 1 ? " · подписок " + subNames.size() : "");
         AppState.log(AppState.lastServers);
         for (Server s : servers) AppState.log(describe(s));
     }
@@ -574,25 +628,27 @@ public class BoxVpnService extends VpnService {
     private void checkSub() throws Exception {
         if (!running) return;
         if (System.currentTimeMillis() - prefs.subUpdated() < SUB_REFRESH_MS) return;
-        String url = prefs.subUrl().trim();
-        if (!isHttp(url)) return;
-        String body;
-        try {
-            body = fetchSub(url);
-        } catch (Exception e) {
-            AppState.log("Автообновление: не удалось скачать подписку (" + e.getMessage() + "), попробую позже");
+        List<String> urls = prefs.subUrls();
+        boolean anyHttp = false;
+        for (String u : urls) anyHttp |= Subs.isHttp(u);
+        if (!anyHttp) return;
+        List<Subs.Entry> entries = loadSubs(urls);
+        if (!running) return;
+        List<String> warnings = new ArrayList<>();
+        List<Server> fresh = Subs.merge(entries, warnings, new ArrayList<String>());
+        if (fresh.isEmpty()) {
+            AppState.log("Автообновление: подписки не скачались, попробую позже");
             return;
         }
-        List<Server> fresh = SubParser.parse(body, new ArrayList<String>());
-        prefs.subCache(body);
+        prefs.markSubUpdated();
         if (signature(fresh).equals(serversSig)) {
-            AppState.log("Автообновление: подписка не изменилась");
+            AppState.log("Автообновление: подписки не изменились");
             return;
         }
         AppState.log("Автообновление: серверы в подписке изменились, перезапускаю ядро");
         if (!running) return;
         try {
-            restartCore(body);
+            restartCore(fresh, warnings);
         } catch (Exception e) {
             AppState.log("Перезапуск ядра не удался: " + e);
             fail("Не удалось применить обновлённую подписку: " + e.getMessage());
@@ -602,7 +658,7 @@ public class BoxVpnService extends VpnService {
     }
 
     /** Restarts only the core with new servers; the VPN interface and the notification stay. */
-    private void restartCore(String body) throws Exception {
+    private void restartCore(List<Server> fresh, List<String> warnings) throws Exception {
         if (!setVpn(AppState.CONNECTING)) return;
         AppState.phase = "Применяю обновлённую подписку";
         AppState.changed();
@@ -611,7 +667,7 @@ public class BoxVpnService extends VpnService {
         if (watchdog != null) watchdog.cancel(false);
         if (pendingReeval != null) pendingReeval.cancel(false);
         stopHelper();
-        applyServers(body);
+        applyServers(fresh, warnings);
         startCore();
     }
 
@@ -1226,7 +1282,7 @@ public class BoxVpnService extends VpnService {
         marker.setLastModified(stamp);
     }
 
-    private String fetch(String url) throws Exception {
+    private String fetch(String url, String[] title) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         try {
             c.setConnectTimeout(10000);
@@ -1243,10 +1299,25 @@ public class BoxVpnService extends VpnService {
             if (code != 200) throw new Exception("HTTP " + code);
             String body = Clash.read(c.getInputStream());
             if (body.trim().isEmpty()) throw new Exception("пустой ответ");
+            title[0] = profileTitle(c.getHeaderField("profile-title"));
             return body;
         } finally {
             c.disconnect();
         }
+    }
+
+    /** profile-title header: plain text or "base64:…". */
+    private static String profileTitle(String h) {
+        if (h == null) return "";
+        h = h.trim();
+        if (h.startsWith("base64:")) {
+            try {
+                h = new String(android.util.Base64.decode(h.substring(7).trim(), android.util.Base64.DEFAULT), "UTF-8").trim();
+            } catch (Exception e) {
+                return "";
+            }
+        }
+        return h.length() > 40 ? h.substring(0, 40) : h;
     }
 
     /** Stable per-device id (ANDROID_ID is fixed for this app on this device). */

@@ -9,6 +9,8 @@ public final class Server {
     public static final int EXCLUDED = 2;
 
     public String rawName;
+    /** Name of the subscription this server came from. */
+    public String sub = "";
     public String name;
     public String tag;
     public int group;

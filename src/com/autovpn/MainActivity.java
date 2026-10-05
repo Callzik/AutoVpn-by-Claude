@@ -443,7 +443,7 @@ public class MainActivity extends Activity {
             return;
         }
         subError.setVisibility(View.GONE);
-        prefs.subUrl(v);
+        prefs.addSub(v);
         showScreen();
     }
 }
