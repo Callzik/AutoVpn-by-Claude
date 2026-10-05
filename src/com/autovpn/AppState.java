@@ -41,6 +41,7 @@ public final class AppState {
     /** tag → last measured delay in ms, -1 = did not answer. */
     public static final java.util.concurrent.ConcurrentHashMap<String, Integer> pings = new java.util.concurrent.ConcurrentHashMap<>();
     public static volatile boolean pinging;
+    public static volatile boolean pingingCurrent;
     public static volatile String lastServers = "";  // summary for settings
 
     private static final List<Runnable> listeners = new CopyOnWriteArrayList<>();

@@ -15,7 +15,24 @@ import java.util.regex.Pattern;
 public final class SubParser {
     private SubParser() {}
 
+    private static int num(String v, int def) {
+        if (v == null || v.trim().isEmpty()) return def;
+        return Integer.parseInt(v.trim());
+    }
+
+    /** Parses and makes server names unique (the manual choice is stored by name). */
     public static List<Server> parse(String text, List<String> warnings) {
+        List<Server> out = parseRaw(text, warnings);
+        java.util.Map<String, Integer> seen = new java.util.HashMap<>();
+        for (Server s : out) {
+            Integer k = seen.get(s.name);
+            seen.put(s.name, k == null ? 1 : k + 1);
+            if (k != null) s.name = s.name + " (" + (k + 1) + ")";
+        }
+        return out;
+    }
+
+    private static List<Server> parseRaw(String text, List<String> warnings) {
         List<Server> out = new ArrayList<>();
         if (text == null) return out;
         String body = text.trim();
@@ -152,9 +169,9 @@ public final class SubParser {
         String host = m.getOrDefault("add", "");
         Server s = newServer(m.getOrDefault("ps", host), host);
         Map<String, Object> o = Json.obj("type", "vmess", "tag", "", "server", host,
-                "server_port", Integer.parseInt(m.getOrDefault("port", "443")),
+                "server_port", num(m.get("port"), 443),
                 "uuid", m.getOrDefault("id", ""),
-                "alter_id", Integer.parseInt(m.getOrDefault("aid", "0").isEmpty() ? "0" : m.get("aid")),
+                "alter_id", num(m.get("aid"), 0),
                 "security", m.getOrDefault("scy", "auto").isEmpty() ? "auto" : m.getOrDefault("scy", "auto"),
                 "packet_encoding", "xudp");
         Map<String, String> q = new HashMap<>();

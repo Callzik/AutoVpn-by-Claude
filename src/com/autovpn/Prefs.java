@@ -22,6 +22,8 @@ public final class Prefs {
         p.edit().putString("sub_cache", body).putLong("sub_updated", System.currentTimeMillis()).apply();
     }
 
+    public void clearSubCache() { p.edit().remove("sub_cache").remove("sub_updated").apply(); }
+
     public String mode() { return p.getString("mode", MODE_WL); }
     public void mode(String v) { p.edit().putString("mode", v).apply(); }
 

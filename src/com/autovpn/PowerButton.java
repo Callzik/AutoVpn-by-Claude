@@ -15,6 +15,8 @@ public class PowerButton extends View {
     private float burst = -1; // 0..1 after connecting, -1 when idle
     private long burstStart;
     private ValueAnimator anim;
+    private float arcAngle;   // accumulated, so it never jumps when the loop restarts or the speed changes
+    private long lastFrame;
 
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -63,15 +65,29 @@ public class PowerButton extends View {
             anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                 @Override public void onAnimationUpdate(ValueAnimator a) {
                     t = (Float) a.getAnimatedValue();
+                    long now = android.os.SystemClock.uptimeMillis();
+                    long dt = lastFrame == 0 ? 0 : Math.min(100, now - lastFrame);
+                    lastFrame = now;
+                    // degrees per second: one turn in ~0.9 s while connecting, slower while waiting
+                    float speed = state == AppState.WAITING ? 180f : 400f;
+                    arcAngle = (arcAngle + speed * dt / 1000f) % 360f;
                     if (burst >= 0) {
                         burst = (System.currentTimeMillis() - burstStart) / 900f;
                         if (burst > 1) burst = -1;
                     }
                     invalidate();
+                    if (state == AppState.OFF && burst < 0) {
+                        a.cancel(); // nothing moves when off: no need to redraw 60 times a second
+                        lastFrame = 0;
+                    }
                 }
             });
         }
-        if (!anim.isRunning()) anim.start();
+        if (state == AppState.OFF && burst < 0) return;
+        if (!anim.isRunning()) {
+            lastFrame = 0;
+            anim.start();
+        }
     }
 
     @Override protected void onAttachedToWindow() {
@@ -141,8 +157,7 @@ public class PowerButton extends View {
             float ar = rb + Ui.dp(getContext(), 7);
             rect.set(cx - ar, cy - ar, cx + ar, cy + ar);
             arc.setColor(state == AppState.WAITING ? Ui.WARN : accent);
-            float speed = state == AppState.WAITING ? 0.5f : 1.8f;
-            c.drawArc(rect, (t * 360f * speed) % 360f, 80, false, arc);
+            c.drawArc(rect, arcAngle - 90f, 80, false, arc);
         }
 
         // power icon

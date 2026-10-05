@@ -32,7 +32,8 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private View mainView, onboardingView;
 
-    private TextView netChip, title, subtitle, banner, wlSub, wlBadge, srvName, srvSub, srvBadge, rtRu, rtRest, errorText;
+    private TextView netChip, title, subtitle, banner, wlBadge, srvName, srvSub, srvBadge, pingBtn, errorText;
+    private View wlDot;
     private PowerButton power;
     private EditText subInput;
     private TextView subError;
@@ -138,7 +139,7 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) { toggle(); }
         });
         hero.addView(power, new LinearLayout.LayoutParams(Ui.dp(c, 264), Ui.dp(c, 264)));
-        title = Ui.text(c, "Не подключено", 28, Ui.FG, true);
+        title = Ui.text(c, "Отключено", 28, Ui.FG, true);
         title.setGravity(Gravity.CENTER);
         hero.addView(title, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 18));
         subtitle = Ui.text(c, "", 15, Ui.MUTED, false);
@@ -158,18 +159,17 @@ public class MainActivity extends Activity {
         banner.setVisibility(View.GONE);
         col.addView(banner, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0));
 
-        // white lists
-        LinearLayout wl = Ui.card(c);
-        LinearLayout wlRow = Ui.row(c);
-        LinearLayout wlText = new LinearLayout(c);
-        wlText.setOrientation(LinearLayout.VERTICAL);
-        wlText.addView(Ui.text(c, "Белые списки", 15, Ui.FG, true));
-        wlSub = Ui.text(c, "Госуслуги и Google", 13, Ui.MUTED, false);
-        wlText.addView(wlSub);
-        wlRow.addView(wlText, Ui.weight());
-        wlBadge = Ui.badge(c);
-        wlRow.addView(wlBadge);
-        wl.addView(wlRow);
+        // white lists: one minimal line
+        LinearLayout wl = Ui.row(c);
+        wl.setBackground(Ui.round(c, Ui.SURFACE, 16, Ui.LINE));
+        wl.setPadding(Ui.dp(c, 16), Ui.dp(c, 12), Ui.dp(c, 16), Ui.dp(c, 12));
+        wlDot = new View(c);
+        wl.addView(wlDot, new LinearLayout.LayoutParams(Ui.dp(c, 8), Ui.dp(c, 8)));
+        TextView wlTitle = Ui.text(c, "Белые списки", 15, Ui.FG, true);
+        wlTitle.setPadding(Ui.dp(c, 10), 0, 0, 0);
+        wl.addView(wlTitle, Ui.weight());
+        wlBadge = Ui.text(c, "—", 15, Ui.MUTED, true);
+        wl.addView(wlBadge);
         col.addView(wl, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
 
         // server
@@ -189,24 +189,24 @@ public class MainActivity extends Activity {
         srv.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, ServersActivity.class)); }
         });
-        TextView srvHint = Ui.text(c, "Все серверы и пинг  ›", 13, Ui.ACCENT, false);
-        srv.addView(srvHint, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+        LinearLayout srvBottom = Ui.row(c);
+        TextView srvHint = Ui.text(c, "Все серверы  ›", 14, Ui.ACCENT, false);
+        srvBottom.addView(srvHint, Ui.weight());
+        pingBtn = Ui.text(c, "Пинг", 14, Ui.FG, true);
+        pingBtn.setGravity(Gravity.CENTER);
+        pingBtn.setBackground(Ui.round(c, Ui.SURFACE2, 14, Ui.LINE2));
+        pingBtn.setPadding(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), Ui.dp(c, 8));
+        pingBtn.setMinWidth(Ui.dp(c, 96));
+        pingBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                BoxVpnService s = BoxVpnService.instance;
+                if (s != null && AppState.vpn == AppState.ON) s.pingCurrent();
+            }
+        });
+        srvBottom.addView(pingBtn);
+        srv.addView(srvBottom, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
         col.addView(srv, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
 
-        // routing
-        LinearLayout rt = Ui.card(c);
-        LinearLayout r1 = Ui.row(c);
-        r1.addView(Ui.text(c, "Российские сайты", 15, Ui.FG, false), Ui.weight());
-        rtRu = Ui.text(c, "напрямую", 14, Ui.MUTED, false);
-        r1.addView(rtRu);
-        rt.addView(r1);
-        rt.addView(Ui.divider(c));
-        LinearLayout r2 = Ui.row(c);
-        r2.addView(Ui.text(c, "Всё остальное", 15, Ui.FG, false), Ui.weight());
-        rtRest = Ui.text(c, "через VPN", 14, Ui.MUTED, false);
-        r2.addView(rtRest);
-        rt.addView(r2);
-        col.addView(rt, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
         return sv;
     }
 
@@ -236,7 +236,7 @@ public class MainActivity extends Activity {
                 subtitle.setText(AppState.phase);
                 break;
             default:
-                title.setText("Не подключено");
+                title.setText("Отключено");
                 subtitle.setText("Нажмите, чтобы включить");
         }
         errorText.setText(s == AppState.OFF ? AppState.error : "");
@@ -253,29 +253,31 @@ public class MainActivity extends Activity {
         }
 
         // white lists
+        int wlColor;
         if (AppState.wlChecking || AppState.wl == AppState.WL_UNKNOWN) {
-            wlBadge.setText(AppState.wlChecking ? "Проверка…" : "—");
-            Ui.tone(this, wlBadge, Ui.TONE_NEUTRAL);
+            wlBadge.setText(AppState.wlChecking ? "проверка…" : "—");
+            wlColor = Ui.MUTED;
         } else if (AppState.wl == AppState.WL_ON) {
-            wlBadge.setText("Включены");
-            Ui.tone(this, wlBadge, Ui.TONE_WARN);
+            wlBadge.setText("вкл");
+            wlColor = Ui.WARN;
         } else if (AppState.wl == AppState.WL_OFF && AppState.regularBlocked && s != AppState.OFF) {
-            wlBadge.setText("Блокировка");
-            Ui.tone(this, wlBadge, Ui.TONE_WARN);
+            wlBadge.setText("выкл · блокировка");
+            wlColor = Ui.WARN;
         } else if (AppState.wl == AppState.WL_OFF) {
-            wlBadge.setText("Выключены");
-            Ui.tone(this, wlBadge, Ui.TONE_OK);
+            wlBadge.setText("выкл");
+            wlColor = Ui.ACCENT;
         } else {
-            wlBadge.setText("Нет сети");
-            Ui.tone(this, wlBadge, Ui.TONE_BAD);
+            wlBadge.setText("нет сети");
+            wlColor = Ui.BAD;
         }
-        if (AppState.wl == AppState.WL_OFF && AppState.regularBlocked && s != AppState.OFF) {
-            wlSub.setText("Сайты открываются, но обычные VPN-серверы заблокированы. Работаю через серверы для БС");
-        } else {
-            wlSub.setText(AppState.wlDetail.isEmpty() ? "Проверяется при подключении" : AppState.wlDetail);
-        }
+        wlBadge.setTextColor(wlColor);
+        wlDot.setBackground(Ui.round(this, wlColor, 4, 0));
 
         // server
+        pingBtn.setVisibility(s == AppState.ON ? View.VISIBLE : View.GONE);
+        pingBtn.setText(AppState.pingingCurrent ? "…" : AppState.ping > 0 ? AppState.ping + " мс" : "Пинг");
+        pingBtn.setTextColor(AppState.pingingCurrent || AppState.ping <= 0 ? Ui.FG
+                : AppState.ping < 150 ? Ui.ACCENT : AppState.ping < 400 ? Ui.WARN : Ui.BAD);
         if (s == AppState.ON && !AppState.serverName.isEmpty()) {
             srvName.setText(AppState.serverName);
             String ping = AppState.ping > 0 ? AppState.ping + " мс" : "пинг —";
@@ -298,10 +300,6 @@ public class MainActivity extends Activity {
             srvBadge.setVisibility(View.GONE);
         }
 
-        boolean on = s == AppState.ON;
-        rtRu.setText(prefs.ruDirect() ? "напрямую" : "через VPN");
-        rtRu.setTextColor(!prefs.ruDirect() && on ? Ui.ACCENT : Ui.MUTED);
-        rtRest.setTextColor(on ? Ui.ACCENT : Ui.MUTED);
     }
 
     private String currentNetGuess() {

@@ -85,6 +85,12 @@ public class SettingsActivity extends Activity {
                     Toast.makeText(SettingsActivity.this, "Это не похоже на ссылку на подписку", Toast.LENGTH_LONG).show();
                     return;
                 }
+                if (!val.equals(prefs.subUrl().trim())) {
+                    prefs.clearSubCache();
+                    prefs.pinned("");
+                    AppState.servers = new java.util.ArrayList<>();
+                    AppState.pings.clear();
+                }
                 prefs.subUrl(val);
                 reconnect();
             }

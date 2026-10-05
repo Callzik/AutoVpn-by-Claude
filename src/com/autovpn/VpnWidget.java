@@ -66,7 +66,7 @@ public class VpnWidget extends AppWidgetProvider {
                 iconColor = Ui.WARN;
                 break;
             default:
-                title = "Выключен";
+                title = "Отключено";
                 status = AppState.error.isEmpty() ? "Нажмите, чтобы включить" : AppState.error;
                 btnBg = R.drawable.widget_btn_off;
                 iconColor = Ui.MUTED;

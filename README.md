@@ -16,4 +16,4 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 
 ## Скачать
 
-Готовый APK (arm64): [`apk/AutoVPN-1.0.apk`](apk/AutoVPN-1.0.apk). Разреши установку из неизвестных источников и вставь ссылку подписки.
+Готовый APK (arm64): [`apk/AutoVPN-1.1.apk`](apk/AutoVPN-1.1.apk). Разреши установку из неизвестных источников и вставь ссылку подписки.
