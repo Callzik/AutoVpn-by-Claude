@@ -31,6 +31,8 @@ public class ServersActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = new Prefs(this);
+        off = prefs.offServers();
+        offAtStart = new java.util.HashSet<>(off);
         getWindow().setStatusBarColor(Ui.BG);
         getWindow().setNavigationBarColor(Ui.BG);
         Context c = this;
@@ -90,6 +92,55 @@ public class ServersActivity extends Activity {
         AppState.removeListener(refresh);
     }
 
+    private java.util.Set<String> off;
+    private java.util.Set<String> offAtStart;
+
+    private boolean isOff(Server s) {
+        return off.contains(s.name);
+    }
+
+    private void toggleOff(final Server s) {
+        final boolean nowOff = isOff(s);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(s.name)
+                .setMessage(nowOff ? "Включить сервер обратно?" : "Отключить сервер? Он не будет участвовать в автовыборе, пока вы его не включите.")
+                .setPositiveButton(nowOff ? "Включить" : "Отключить", new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        if (nowOff) off.remove(s.name); else off.add(s.name);
+                        prefs.offServers(off);
+                        if (!nowOff && s.name.equals(prefs.pinned())) {
+                            prefs.pinned("");
+                            AppState.pinned = "";
+                        }
+                        update();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // turning servers on/off changes the core config: reconnect once when leaving the screen
+        if (isFinishing() && off != null && !off.equals(offAtStart) && AppState.vpn != AppState.OFF) {
+            offAtStart = new java.util.HashSet<>(off);
+            AppState.servers = new ArrayList<>();
+            final Context app = getApplicationContext();
+            VpnControl.stop(app);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override public void run() {
+                    try {
+                        VpnControl.start(app);
+                    } catch (Exception e) {
+                        AppState.log("Не удалось переподключиться: " + e.getMessage());
+                    }
+                }
+            }, 3000);
+            Toast.makeText(app, "Переподключаюсь, чтобы применить", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private int ping(Server s) {
         Integer p = AppState.pings.get(s.tag);
         return p == null ? 0 : p; // 0 unknown, -1 no answer
@@ -99,7 +150,7 @@ public class ServersActivity extends Activity {
         List<Server> src = AppState.servers;
         if (src == null || src.isEmpty()) {
             try {
-                src = Subs.merge(Subs.cached(prefs), new ArrayList<String>(), new ArrayList<String>());
+                src = Subs.applyOff(Subs.merge(Subs.cached(prefs), new ArrayList<String>(), new ArrayList<String>()), prefs.offServers());
             } catch (Exception e) {
                 src = new ArrayList<>();
             }
@@ -107,13 +158,15 @@ public class ServersActivity extends Activity {
         items.clear();
         java.util.Set<String> subs = new java.util.HashSet<>();
         for (Server s : src) {
-            if (s.group != Server.EXCLUDED) items.add(s);
+            if (s.group != Server.EXCLUDED || s.off) items.add(s);
             subs.add(s.sub);
         }
         manySubs = subs.size() > 1;
         Collections.sort(items, new Comparator<Server>() {
             @Override public int compare(Server a, Server b) {
-                if (a.group != b.group) return a.group - b.group;
+                boolean oa = isOff(a), ob = isOff(b);
+                if (oa != ob) return oa ? 1 : -1;
+                if (a.origGroup != b.origGroup) return a.origGroup - b.origGroup;
                 int pa = ping(a), pb = ping(b);
                 int ka = pa > 0 ? pa : pa == 0 ? 100000 : 200000;
                 int kb = pb > 0 ? pb : pb == 0 ? 100000 : 200000;
@@ -123,8 +176,9 @@ public class ServersActivity extends Activity {
         boolean on = AppState.vpn == AppState.ON;
         test.setText(AppState.pinging ? "Проверяю…" : "Проверить");
         test.setAlpha(on && !AppState.pinging ? 1f : 0.5f);
-        hint.setText(on ? "Нажмите на сервер, чтобы использовать его. «Авто» выбирает лучший сам."
-                : "Подключитесь, чтобы увидеть пинг. Выбор применится при подключении.");
+        hint.setText((on ? "Нажмите на сервер, чтобы использовать его. «Авто» выбирает лучший сам."
+                : "Подключитесь, чтобы увидеть пинг. Выбор применится при подключении.")
+                + " Долгое нажатие — отключить или включить сервер." + (off.isEmpty() ? "" : " Отключено: " + off.size()));
         adapter.notifyDataSetChanged();
     }
 
@@ -172,9 +226,26 @@ public class ServersActivity extends Activity {
             }
             final Server s = items.get(pos - 1);
             name.setText(s.name);
-            sub.setText((s.group == Server.LTE ? "LTE / белые списки" : "обычный") + (manySubs && !s.sub.isEmpty() ? " · " + s.sub : ""));
+            sub.setText((s.origGroup == Server.LTE ? "LTE / белые списки" : "обычный") + (manySubs && !s.sub.isEmpty() ? " · " + s.sub : ""));
             sub.setSingleLine(true);
             int p = ping(s);
+            root.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override public boolean onLongClick(View v) {
+                    toggleOff(s);
+                    return true;
+                }
+            });
+            if (isOff(s)) {
+                root.setAlpha(0.45f);
+                right.setText("отключён");
+                right.setTextColor(Ui.MUTED);
+                root.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        Toast.makeText(ServersActivity.this, "Сервер отключён. Долгое нажатие — включить", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                return root;
+            }
             if (AppState.pinned.equals(s.name) || pinned.equals(s.name)) {
                 right.setText((p > 0 ? p + " мс  " : "") + "✓");
                 right.setTextColor(Ui.ACCENT);

@@ -14,6 +14,9 @@ public final class Server {
     public String name;
     public String tag;
     public int group;
+    /** Turned off by the user: kept in the list, left out of the core. {@link #group} is then EXCLUDED. */
+    public boolean off;
+    public int origGroup;
     public String excludeReason;
     public Map<String, Object> outbound;
     /** Real server address (outbound may point at the local Xray). */

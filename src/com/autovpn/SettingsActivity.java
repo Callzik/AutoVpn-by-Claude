@@ -229,7 +229,7 @@ public class SettingsActivity extends Activity {
         if (entries.isEmpty()) return "Подписка ещё не загружалась. Подключитесь один раз.";
         List<String> warnings = new ArrayList<>();
         List<String> stubs = new ArrayList<>();
-        List<Server> list = Subs.merge(entries, warnings, stubs);
+        List<Server> list = Subs.applyOff(Subs.merge(entries, warnings, stubs), prefs.offServers());
         for (String st : stubs) warnings.add("заглушка вместо серверов — " + st);
         StringBuilder sb = new StringBuilder();
         String[] titles = {"Обычные", "LTE (для белых списков)", "Не участвуют"};

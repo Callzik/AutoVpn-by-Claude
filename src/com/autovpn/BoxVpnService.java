@@ -222,8 +222,11 @@ public class BoxVpnService extends VpnService {
         if (!running) return;
         List<String> warnings = new ArrayList<>();
         List<String> stubs = new ArrayList<>();
-        List<Server> merged = Subs.merge(entries, warnings, stubs);
+        List<Server> merged = Subs.applyOff(Subs.merge(entries, warnings, stubs), prefs.offServers());
         for (String st : stubs) AppState.log("Вместо серверов заглушка — " + st);
+        int usable = 0;
+        for (Server s : merged) if (s.group != Server.EXCLUDED) usable++;
+        if (!merged.isEmpty() && usable == 0) throw new Exception("Все серверы отключены. Включите хотя бы один в списке серверов");
         if (merged.isEmpty()) {
             if (!stubs.isEmpty()) throw new Exception("Сервис подписки вместо серверов прислал заглушку: " + stubs.get(0));
             throw new Exception("Не удалось скачать подписку. Проверьте ссылку и интернет");
@@ -646,7 +649,7 @@ public class BoxVpnService extends VpnService {
         List<Subs.Entry> entries = loadSubs(urls);
         if (!running) return;
         List<String> warnings = new ArrayList<>();
-        List<Server> fresh = Subs.merge(entries, warnings, new ArrayList<String>());
+        List<Server> fresh = Subs.applyOff(Subs.merge(entries, warnings, new ArrayList<String>()), prefs.offServers());
         if (fresh.isEmpty()) {
             AppState.log("Автообновление: подписки не скачались, попробую позже");
             return;

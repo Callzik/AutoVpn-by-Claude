@@ -97,6 +97,14 @@ public final class Prefs {
         p.edit().putStringSet("excluded_apps", new java.util.HashSet<>(v)).apply();
     }
 
+    /** Servers the user turned off (by name). */
+    public java.util.Set<String> offServers() {
+        return new java.util.HashSet<>(p.getStringSet("off_servers", new java.util.HashSet<String>()));
+    }
+    public void offServers(java.util.Set<String> v) {
+        p.edit().putStringSet("off_servers", new java.util.HashSet<>(v)).apply();
+    }
+
     /** Name of the server chosen by hand, empty = automatic. */
     public String pinned() { return p.getString("pinned", ""); }
     public void pinned(String v) { p.edit().putString("pinned", v).apply(); }

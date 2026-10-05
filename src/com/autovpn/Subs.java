@@ -47,6 +47,19 @@ public final class Subs {
         return out;
     }
 
+    /** Marks servers the user turned off: they stay listed but get no place in the core. */
+    public static List<Server> applyOff(List<Server> list, java.util.Set<String> off) {
+        for (Server s : list) {
+            s.origGroup = s.group;
+            if (s.group != Server.EXCLUDED && off.contains(s.name)) {
+                s.off = true;
+                s.group = Server.EXCLUDED;
+                s.excludeReason = "Отключён вручную";
+            }
+        }
+        return list;
+    }
+
     /**
      * Parses every subscription and joins the servers. Server names stay unique across subscriptions
      * (the manual choice is stored by name) and tags are renumbered so they never clash.
