@@ -254,7 +254,10 @@ public class MainActivity extends Activity {
 
         // white lists
         int wlColor;
-        if (AppState.wlChecking || AppState.wl == AppState.WL_UNKNOWN) {
+        if (AppState.wlSkipped && s != AppState.OFF && !AppState.regularBlocked) {
+            wlBadge.setText("Wi-Fi · не проверяю");
+            wlColor = Ui.MUTED;
+        } else if (AppState.wlChecking || AppState.wl == AppState.WL_UNKNOWN) {
             wlBadge.setText(AppState.wlChecking ? "проверка…" : "—");
             wlColor = Ui.MUTED;
         } else if (AppState.wl == AppState.WL_ON) {

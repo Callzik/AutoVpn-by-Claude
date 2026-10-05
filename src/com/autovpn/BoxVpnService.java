@@ -892,6 +892,18 @@ public class BoxVpnService extends VpnService {
     }
 
     private void probeWl() {
+        if ("wifi".equals(AppState.net)) {
+            // operators' white lists exist only on mobile networks: no probing on Wi-Fi
+            boolean was = AppState.wlSkipped;
+            AppState.wl = AppState.WL_OFF;
+            AppState.wlSkipped = true;
+            AppState.wlChecking = false;
+            AppState.wlDetail = "На Wi-Fi не проверяются";
+            if (!was) AppState.log("Wi-Fi: белые списки не проверяю");
+            AppState.changed();
+            return;
+        }
+        AppState.wlSkipped = false;
         AppState.wlChecking = true;
         AppState.changed();
         WlProbe.Result r = WlProbe.run(underlying);

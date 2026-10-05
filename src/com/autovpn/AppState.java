@@ -22,6 +22,8 @@ public final class AppState {
     public static volatile String net = "none";      // wifi | cell | other | none
     public static volatile int wl = WL_UNKNOWN;
     public static volatile boolean wlChecking;
+    /** On Wi-Fi white lists are not probed. */
+    public static volatile boolean wlSkipped;
     public static volatile String wlDetail = "";
     /** White lists look off, but regular VPN servers are blocked and only white-list servers work. */
     public static volatile boolean regularBlocked;
