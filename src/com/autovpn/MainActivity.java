@@ -254,10 +254,7 @@ public class MainActivity extends Activity {
 
         // white lists
         int wlColor;
-        if (AppState.wlSkipped && s != AppState.OFF && !AppState.regularBlocked) {
-            wlBadge.setText("Wi-Fi · не проверяю");
-            wlColor = Ui.MUTED;
-        } else if (AppState.wlChecking || AppState.wl == AppState.WL_UNKNOWN) {
+        if (AppState.wlChecking || AppState.wl == AppState.WL_UNKNOWN) {
             wlBadge.setText(AppState.wlChecking ? "проверка…" : "—");
             wlColor = Ui.MUTED;
         } else if (AppState.wl == AppState.WL_ON) {
@@ -295,11 +292,11 @@ public class MainActivity extends Activity {
             srvBadge.setVisibility(View.GONE);
         } else if (s == AppState.WAITING) {
             srvName.setText("Сервер не выбран");
-            srvSub.setText("Выберу, как только будет связь");
+            srvSub.setText("Выбор сервера после появления связи");
             srvBadge.setVisibility(View.GONE);
         } else {
             srvName.setText("Автовыбор сервера");
-            srvSub.setText("Подключит к самому быстрому");
+            srvSub.setText("Подключение к самому быстрому");
             srvBadge.setVisibility(View.GONE);
         }
 

@@ -12,7 +12,7 @@ echo "== resources"
 $T/aapt2 compile --dir res -o $B/res.zip
 $T/aapt2 link -o $B/base.apk -I $ANDROID_JAR --manifest AndroidManifest.xml \
   --java $B/gen -A assets --min-sdk-version 26 --target-sdk-version 33 \
-  --version-code 16 --version-name 1.5 $B/res.zip
+  --version-code 17 --version-name 1.6 $B/res.zip
 
 echo "== java"
 javac -nowarn -encoding UTF-8 --release 8 -Xlint:-options -classpath $ANDROID_JAR -d $B/classes \

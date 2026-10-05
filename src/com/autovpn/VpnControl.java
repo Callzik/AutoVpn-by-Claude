@@ -78,7 +78,7 @@ final class VpnControl {
                 String s = AppState.serverName.isEmpty() ? "Подключено" : AppState.serverName;
                 return AppState.ping > 0 ? s + " · " + AppState.ping + " мс" : s;
             case AppState.CONNECTING: return "Подключение…";
-            case AppState.WAITING: return "Нет ответа, жду";
+            case AppState.WAITING: return "Нет ответа, ожидание";
             default: return AppState.error.isEmpty() ? "Выключен" : "Ошибка";
         }
     }

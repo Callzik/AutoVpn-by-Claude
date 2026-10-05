@@ -41,7 +41,7 @@ final class XrayJson {
                 try {
                     s = o.containsKey("protocol") ? fromXray(o, obs, remarks, warnings) : fromSingBox(o, remarks);
                 } catch (Exception e) {
-                    warnings.add("«" + remarks + "»: не разобрал сервер (" + e.getMessage() + ")");
+                    warnings.add("«" + remarks + "»: не удалось разобрать сервер (" + e.getMessage() + ")");
                     continue;
                 }
                 if (s != null) fromCfg.add(s);

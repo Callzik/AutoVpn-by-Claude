@@ -137,7 +137,7 @@ public class ServersActivity extends Activity {
                     }
                 }
             }, 3000);
-            Toast.makeText(app, "Переподключаюсь, чтобы применить", Toast.LENGTH_SHORT).show();
+            Toast.makeText(app, "Переподключение для применения", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -174,7 +174,7 @@ public class ServersActivity extends Activity {
             }
         });
         boolean on = AppState.vpn == AppState.ON;
-        test.setText(AppState.pinging ? "Проверяю…" : "Проверить");
+        test.setText(AppState.pinging ? "Проверка…" : "Проверить");
         test.setAlpha(on && !AppState.pinging ? 1f : 0.5f);
         hint.setText((on ? "Нажмите на сервер, чтобы использовать его. «Авто» выбирает лучший сам."
                 : "Подключитесь, чтобы увидеть пинг. Выбор применится при подключении.")

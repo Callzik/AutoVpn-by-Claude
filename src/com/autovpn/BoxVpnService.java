@@ -121,7 +121,7 @@ public class BoxVpnService extends VpnService {
         exec = Executors.newSingleThreadScheduledExecutor();
         AppState.vpn = AppState.CONNECTING;
         AppState.error = "";
-        AppState.phase = "Загружаю подписку";
+        AppState.phase = "Загрузка подписки";
         AppState.serverName = "";
         AppState.ping = -1;
         AppState.changed();
@@ -216,7 +216,7 @@ public class BoxVpnService extends VpnService {
         // Subscriptions
         List<String> urls = prefs.subUrls();
         if (urls.isEmpty()) throw new Exception("Добавьте ссылку на подписку");
-        AppState.phase = urls.size() > 1 ? "Загружаю подписки (" + urls.size() + ")" : "Загружаю подписку";
+        AppState.phase = urls.size() > 1 ? "Загрузка подписок (" + urls.size() + ")" : "Загрузка подписки";
         AppState.changed();
         List<Subs.Entry> entries = loadSubs(urls);
         if (!running) return;
@@ -237,7 +237,7 @@ public class BoxVpnService extends VpnService {
 
         // Network + white lists
         registerNetwork();
-        AppState.phase = "Проверяю белые списки";
+        AppState.phase = "Проверка белых списков";
         AppState.changed();
         probeWl();
         if (!running) return;
@@ -285,7 +285,7 @@ public class BoxVpnService extends VpnService {
                         boolean stub = stubReason(SubParser.parse(body, new ArrayList<String>())) != null;
                         String cache = prefs.subCache(url);
                         if (stub && !cache.isEmpty()) {
-                            AppState.log(e.name + ": вместо серверов заглушка, беру сохранённую копию");
+                            AppState.log(e.name + ": вместо серверов заглушка, используется сохранённая копия");
                             body = cache;
                         } else if (!stub) {
                             prefs.subCache(url, body);
@@ -297,7 +297,7 @@ public class BoxVpnService extends VpnService {
                         e.name = Subs.label(prefs, url);
                         String cache = prefs.subCache(url);
                         AppState.log(e.name + ": не удалось скачать (" + ex.getMessage() + ")"
-                                + (cache.isEmpty() ? "" : ", беру сохранённую копию"));
+                                + (cache.isEmpty() ? "" : ", используется сохранённая копия"));
                         if (!cache.isEmpty()) {
                             e.body = cache;
                             out.add(e);
@@ -378,7 +378,7 @@ public class BoxVpnService extends VpnService {
         fo.write(config.getBytes("UTF-8"));
         fo.close();
 
-        AppState.phase = "Запускаю ядро";
+        AppState.phase = "Запуск ядра";
         AppState.changed();
         if (!running) return;
         startXray();
@@ -404,14 +404,14 @@ public class BoxVpnService extends VpnService {
             }
         }, "direct-check").start();
 
-        AppState.phase = "Ищу самый быстрый сервер (" + groupLabel(group) + ")";
+        AppState.phase = "Поиск самого быстрого сервера (" + groupLabel(group) + ")";
         AppState.changed();
         String working = ensureWorkingGroup(group, true);
         if (working == null) {
             if (!setVpn(AppState.WAITING)) return;
             AppState.phase = AppState.wl == AppState.WL_NONET
-                    ? "Нет интернета. Подключусь, когда сеть появится"
-                    : "Ни один сервер не отвечает. Повторю автоматически";
+                    ? "Нет интернета. Подключение после появления сети"
+                    : "Ни один сервер не отвечает. Повторная попытка через несколько секунд";
         } else {
             if (!setVpn(AppState.ON)) return;
             AppState.since = System.currentTimeMillis();
@@ -526,11 +526,11 @@ public class BoxVpnService extends VpnService {
         if (ensureWorkingGroup(g, false) == null) {
             clash.select(ConfigBuilder.SELECTOR, g);
             if (!setVpn(AppState.WAITING)) return;
-            AppState.phase = "Ни один сервер не отвечает. Повторю автоматически";
+            AppState.phase = "Ни один сервер не отвечает. Повторная попытка через несколько секунд";
             scheduleReevaluate("retry", 15000);
         }
         refreshStatus();
-        AppState.banner("Выбранный сервер не отвечает — вернулся автовыбор", 2);
+        AppState.banner("Выбранный сервер не отвечает — включён автовыбор", 2);
     }
 
     /** Selects a server by name; false when there is no such server. */
@@ -561,7 +561,7 @@ public class BoxVpnService extends VpnService {
                         if (ensureWorkingGroup(desiredGroup(), false) == null) {
                             clash.select(ConfigBuilder.SELECTOR, desiredGroup());
                             if (!setVpn(AppState.WAITING)) return;
-                            AppState.phase = "Ни один сервер не отвечает. Повторю автоматически";
+                            AppState.phase = "Ни один сервер не отвечает. Повторная попытка через несколько секунд";
                             scheduleReevaluate("retry", 15000);
                         }
                     } else if (!applyPin(name)) {
@@ -651,7 +651,7 @@ public class BoxVpnService extends VpnService {
         List<String> warnings = new ArrayList<>();
         List<Server> fresh = Subs.applyOff(Subs.merge(entries, warnings, new ArrayList<String>()), prefs.offServers());
         if (fresh.isEmpty()) {
-            AppState.log("Автообновление: подписки не скачались, попробую позже");
+            AppState.log("Автообновление: подписки не скачались, повтор позже");
             return;
         }
         prefs.markSubUpdated();
@@ -659,7 +659,7 @@ public class BoxVpnService extends VpnService {
             AppState.log("Автообновление: подписки не изменились");
             return;
         }
-        AppState.log("Автообновление: серверы в подписке изменились, перезапускаю ядро");
+        AppState.log("Автообновление: серверы в подписке изменились, перезапуск ядра");
         if (!running) return;
         try {
             restartCore(fresh, warnings);
@@ -674,7 +674,7 @@ public class BoxVpnService extends VpnService {
     /** Restarts only the core with new servers; the VPN interface and the notification stay. */
     private void restartCore(List<Server> fresh, List<String> warnings) throws Exception {
         if (!setVpn(AppState.CONNECTING)) return;
-        AppState.phase = "Применяю обновлённую подписку";
+        AppState.phase = "Применение обновлённой подписки";
         AppState.changed();
         if (periodic != null) periodic.cancel(false);
         if (statusTask != null) statusTask.cancel(false);
@@ -749,7 +749,7 @@ public class BoxVpnService extends VpnService {
         }
         if (res.isEmpty()) return null;
         AppState.regularBlocked = ConfigBuilder.GROUP_LTE.equals(use) && ConfigBuilder.GROUP_REGULAR.equals(group);
-        if (AppState.regularBlocked) AppState.log("Обычные серверы не отвечают, хотя белых списков нет — работаю через серверы для БС");
+        if (AppState.regularBlocked) AppState.log("Обычные серверы не отвечают, хотя белых списков нет — используются серверы для БС");
         clash.select(ConfigBuilder.SELECTOR, use);
         activeGroup = use;
         AppState.group = use;
@@ -795,8 +795,8 @@ public class BoxVpnService extends VpnService {
         if (AppState.wl == AppState.WL_NONET) {
             if (AppState.vpn != AppState.WAITING) {
                 if (!setVpn(AppState.WAITING)) return;
-                AppState.phase = "Нет интернета. Подключусь, когда сеть появится";
-                AppState.log("Сеть пропала — жду");
+                AppState.phase = "Нет интернета. Подключение после появления сети";
+                AppState.log("Сеть пропала — ожидание");
                 AppState.changed();
             }
             scheduleReevaluate("retry", 30000);
@@ -841,7 +841,7 @@ public class BoxVpnService extends VpnService {
         AppState.switching = false;
         if (used == null) {
             if (!setVpn(AppState.WAITING)) return;
-            AppState.phase = "Ни один сервер не отвечает. Повторю автоматически";
+            AppState.phase = "Ни один сервер не отвечает. Повторная попытка через несколько секунд";
             AppState.changed();
             scheduleReevaluate("retry", 15000);
             return;
@@ -899,7 +899,7 @@ public class BoxVpnService extends VpnService {
             AppState.wlSkipped = true;
             AppState.wlChecking = false;
             AppState.wlDetail = "На Wi-Fi не проверяются";
-            if (!was) AppState.log("Wi-Fi: белые списки не проверяю");
+            if (!was) AppState.log("Wi-Fi: белые списки не проверяются");
             AppState.changed();
             return;
         }

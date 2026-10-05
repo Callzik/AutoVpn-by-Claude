@@ -55,13 +55,13 @@ public class VpnWidget extends AppWidgetProvider {
                 break;
             case AppState.CONNECTING:
                 title = "Подключение…";
-                status = AppState.phase.isEmpty() ? "Ищу сервер" : AppState.phase;
+                status = AppState.phase.isEmpty() ? "Поиск сервера" : AppState.phase;
                 btnBg = R.drawable.widget_btn_wait;
                 iconColor = Ui.WARN;
                 break;
             case AppState.WAITING:
                 title = "Нет ответа";
-                status = "Повторю автоматически";
+                status = "Повторная попытка через несколько секунд";
                 btnBg = R.drawable.widget_btn_wait;
                 iconColor = Ui.WARN;
                 break;

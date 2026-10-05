@@ -100,7 +100,7 @@ public class AppsActivity extends Activity {
         countText = Ui.text(c, "", 13, Ui.MUTED, false);
         col.addView(countText, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
 
-        loading = Ui.text(c, "Загружаю список приложений…", 14, Ui.MUTED, false);
+        loading = Ui.text(c, "Загрузка списка приложений…", 14, Ui.MUTED, false);
         loading.setGravity(Gravity.CENTER);
         col.addView(loading, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 24));
 
@@ -185,7 +185,7 @@ public class AppsActivity extends Activity {
                         }
                     }
                 }, 3000);
-                Toast.makeText(this, "Переподключаюсь, чтобы применить", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Переподключение для применения", Toast.LENGTH_SHORT).show();
             }
         }
     }

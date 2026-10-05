@@ -369,7 +369,7 @@ public class SettingsActivity extends Activity {
                     app.startForegroundService(new Intent(app, BoxVpnService.class).setAction(BoxVpnService.ACTION_START));
                 }
             }, 3000);
-            Toast.makeText(this, "Переподключаюсь…", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Переподключение…", Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, "Сохранено", Toast.LENGTH_SHORT).show();
         }

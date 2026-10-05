@@ -54,7 +54,7 @@ public final class SubParser {
                     out.add(s);
                 }
             } catch (Exception e) {
-                warnings.add("Не разобрал JSON-подписку: " + e.getMessage());
+                warnings.add("Не удалось разобрать JSON-подписку: " + e.getMessage());
             }
             return out;
         }
@@ -71,7 +71,7 @@ public final class SubParser {
                 classify(s);
                 out.add(s);
             } catch (Exception e) {
-                warnings.add("Не разобрал ссылку: " + shortLink(line) + " (" + e.getMessage() + ")");
+                warnings.add("Не удалось разобрать ссылку: " + shortLink(line) + " (" + e.getMessage() + ")");
             }
         }
         return out;
