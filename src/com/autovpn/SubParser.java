@@ -158,9 +158,56 @@ public final class SubParser {
         }
         String security = p.q("security");
         if (type.equals("trojan") && security.isEmpty()) security = "tls";
+        if (isXhttp(p.q("type"))) {
+            s.xray = xrayFromLink(type, p, security);
+            s.outbound = xrayPlaceholder();
+            return s;
+        }
         if (!applyStream(o, p.query, security, p.host, warnings, s.rawName)) return null;
         s.outbound = o;
         return s;
+    }
+
+    /** Xray outbound for a vless:// or trojan:// link with type=xhttp. */
+    private static Map<String, Object> xrayFromLink(String type, Parts p, String security) {
+        Map<String, Object> settings;
+        if (type.equals("vless")) {
+            Map<String, Object> user = Json.obj("id", p.user, "encryption", p.q("encryption").isEmpty() ? "none" : p.q("encryption"));
+            if (!p.q("flow").isEmpty()) user.put("flow", p.q("flow"));
+            settings = Json.obj("vnext", Json.arr(Json.obj("address", p.host, "port", p.port, "users", Json.arr(user))));
+        } else {
+            settings = Json.obj("servers", Json.arr(Json.obj("address", p.host, "port", p.port, "password", p.user)));
+        }
+        Map<String, Object> xh = Json.obj("path", p.q("path").isEmpty() ? "/" : p.q("path"));
+        if (!p.q("host").isEmpty()) xh.put("host", p.q("host"));
+        xh.put("mode", p.q("mode").isEmpty() ? "auto" : p.q("mode"));
+        if (!p.q("extra").isEmpty()) {
+            try {
+                xh.put("extra", Json.parse(p.q("extra")));
+            } catch (Exception ignored) {
+            }
+        }
+        Map<String, Object> st = Json.obj("network", "xhttp", "xhttpSettings", xh);
+        String sni = p.q("sni").isEmpty() ? p.q("peer") : p.q("sni");
+        String fp = p.q("fp");
+        if ("reality".equals(security)) {
+            st.put("security", "reality");
+            Map<String, Object> r = Json.obj("serverName", sni.isEmpty() ? p.host : sni,
+                    "fingerprint", fp.isEmpty() ? "chrome" : fp, "publicKey", p.q("pbk"), "shortId", p.q("sid"));
+            if (!p.q("spx").isEmpty()) r.put("spiderX", p.q("spx"));
+            if (!p.q("pqv").isEmpty()) r.put("mldsa65Verify", p.q("pqv"));
+            st.put("realitySettings", r);
+        } else if ("tls".equals(security)) {
+            st.put("security", "tls");
+            Map<String, Object> t = Json.obj("serverName", !sni.isEmpty() ? sni : !p.q("host").isEmpty() ? p.q("host") : p.host);
+            if (!fp.isEmpty()) t.put("fingerprint", fp);
+            if (!p.q("alpn").isEmpty()) t.put("alpn", new ArrayList<Object>(java.util.Arrays.asList(p.q("alpn").split(","))));
+            if ("1".equals(p.q("allowInsecure")) || "true".equals(p.q("allowInsecure"))) t.put("allowInsecure", true);
+            st.put("tlsSettings", t);
+        } else {
+            st.put("security", "none");
+        }
+        return Json.obj("protocol", type, "settings", settings, "streamSettings", st);
     }
 
     private static Server parseVmess(String link, List<String> warnings) {
@@ -312,7 +359,17 @@ public final class SubParser {
         Server s = new Server();
         s.rawName = (rawName == null || rawName.trim().isEmpty()) ? host : rawName.trim();
         s.name = cleanName(s.rawName);
+        s.host = host == null ? "" : host;
         return s;
+    }
+
+    /** sing-box side of an Xray-carried server; port and credentials are filled in at start. */
+    static Map<String, Object> xrayPlaceholder() {
+        return Json.obj("type", "socks", "tag", "", "server", "127.0.0.1", "server_port", 0, "version", "5");
+    }
+
+    static boolean isXhttp(String type) {
+        return "xhttp".equals(type) || "splithttp".equals(type);
     }
 
     private static String val(Map<String, String> q, String k) {

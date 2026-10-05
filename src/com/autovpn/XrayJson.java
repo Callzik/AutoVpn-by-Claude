@@ -39,7 +39,7 @@ final class XrayJson {
                 if (o == null) continue;
                 Server s;
                 try {
-                    s = o.containsKey("protocol") ? fromXray(o, remarks, warnings) : fromSingBox(o, remarks);
+                    s = o.containsKey("protocol") ? fromXray(o, obs, remarks, warnings) : fromSingBox(o, remarks);
                 } catch (Exception e) {
                     warnings.add("«" + remarks + "»: не разобрал сервер (" + e.getMessage() + ")");
                     continue;
@@ -54,7 +54,7 @@ final class XrayJson {
                 }
             }
             for (Server s : fromCfg) {
-                String key = Json.write(s.outbound) + "|" + s.rawName.replaceAll(" #\\d+$", "");
+                String key = Json.write(s.outbound) + (s.xray != null ? Json.write(s.xray) : "") + "|" + s.rawName.replaceAll(" #\\d+$", "");
                 if (seen.add(key)) out.add(s);
             }
         }
@@ -78,7 +78,7 @@ final class XrayJson {
 
     /* ---------- Xray outbound ---------- */
 
-    private static Server fromXray(Map<String, Object> o, String remarks, List<String> warnings) {
+    private static Server fromXray(Map<String, Object> o, List<Object> all, String remarks, List<String> warnings) {
         String proto = str(o.get("protocol"));
         Map<String, Object> settings = map(o.get("settings"));
         if (settings == null) return null;
@@ -126,6 +126,14 @@ final class XrayJson {
         if (st == null) st = new HashMap<>();
         Map<String, String> q = new HashMap<>();
         String net = str(st.get("network"));
+        if (SubParser.isXhttp(net)) {
+            // sing-box has no xhttp: hand this outbound to the bundled Xray as it is
+            s.xray = copy(o);
+            s.xray.remove("tag");
+            s.xrayDeps = deps(st, all);
+            s.outbound = SubParser.xrayPlaceholder();
+            return s;
+        }
         q.put("type", net.isEmpty() ? "tcp" : net);
         String security = str(st.get("security"));
         if (security.equals("none")) security = "";
@@ -199,6 +207,107 @@ final class XrayJson {
         if (!SubParser.applyStream(sb, q, security, host, warnings, s.rawName)) return null;
         s.outbound = sb;
         return s;
+    }
+
+    /** Outbounds this one dials through (sockopt.dialerProxy, also inside downloadSettings), followed recursively. */
+    private static List<Map<String, Object>> deps(Map<String, Object> st, List<Object> all) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        List<String> want = new ArrayList<>();
+        collectDialer(st, want);
+        for (int i = 0; i < want.size() && i < 8; i++) {
+            String tag = want.get(i);
+            for (Object ob : all) {
+                Map<String, Object> d = map(ob);
+                if (d != null && tag.equals(str(d.get("tag")))) {
+                    boolean dup = false;
+                    for (Map<String, Object> e : out) dup |= tag.equals(str(e.get("tag")));
+                    if (!dup) {
+                        out.add(copy(d));
+                        collectDialer(map(d.get("streamSettings")), want);
+                    }
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void collectDialer(Map<String, Object> st, List<String> into) {
+        if (st == null) return;
+        Map<String, Object> so = map(st.get("sockopt"));
+        if (so != null && !str(so.get("dialerProxy")).isEmpty()) into.add(str(so.get("dialerProxy")));
+        Map<String, Object> xh = map(st.get("xhttpSettings"));
+        Map<String, Object> extra = xh == null ? null : map(xh.get("extra"));
+        Map<String, Object> dl = extra == null ? null : map(extra.get("downloadSettings"));
+        if (dl != null) collectDialer(dl, into);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> copy(Map<String, Object> o) {
+        try {
+            return (Map<String, Object>) Json.parse(Json.write(o));
+        } catch (Exception e) {
+            return new java.util.LinkedHashMap<>(o);
+        }
+    }
+
+    /**
+     * Config for the bundled Xray: one password-protected local socks inbound per server, routed to that
+     * server's outbound. sing-box reaches each server through its inbound.
+     */
+    static String buildCoreConfig(List<Server> servers, String user, String pass) {
+        List<Object> inbounds = new ArrayList<>();
+        List<Object> outbounds = new ArrayList<>();
+        List<Object> rules = new ArrayList<>();
+        outbounds.add(Json.obj("protocol", "blackhole", "tag", "block"));
+        for (Server s : servers) {
+            if (s.xray == null) continue;
+            String in = "in-" + s.tag, out = "out-" + s.tag;
+            inbounds.add(Json.obj("tag", in, "listen", "127.0.0.1", "port", s.outbound.get("server_port"), "protocol", "socks",
+                    "settings", Json.obj("auth", "password", "accounts", Json.arr(Json.obj("user", user, "pass", pass)),
+                            "udp", true, "ip", "127.0.0.1")));
+            Map<String, Object> ob = copy(s.xray);
+            ob.put("tag", out);
+            // dialer chains get tags unique to this server
+            Map<String, String> rename = new HashMap<>();
+            int k = 0;
+            if (s.xrayDeps != null) for (Map<String, Object> d : s.xrayDeps) rename.put(str(d.get("tag")), out + "-via" + (++k));
+            retag(ob, rename);
+            outbounds.add(ob);
+            if (s.xrayDeps != null) {
+                for (Map<String, Object> d0 : s.xrayDeps) {
+                    Map<String, Object> d = copy(d0);
+                    d.put("tag", rename.get(str(d0.get("tag"))));
+                    retag(d, rename);
+                    outbounds.add(d);
+                }
+            }
+            rules.add(Json.obj("type", "field", "inboundTag", Json.arr(in), "outboundTag", out));
+        }
+        return Json.write(Json.obj(
+                "log", Json.obj("loglevel", "warning"),
+                "inbounds", inbounds,
+                "outbounds", outbounds,
+                "routing", Json.obj("domainStrategy", "AsIs", "rules", rules)));
+    }
+
+    /** Rewrites sockopt.dialerProxy references (also in xhttp downloadSettings). */
+    private static void retag(Map<String, Object> ob, Map<String, String> rename) {
+        Map<String, Object> st = map(ob.get("streamSettings"));
+        retagStream(st, rename);
+    }
+
+    private static void retagStream(Map<String, Object> st, Map<String, String> rename) {
+        if (st == null) return;
+        Map<String, Object> so = map(st.get("sockopt"));
+        if (so != null && so.containsKey("dialerProxy")) {
+            String t = str(so.get("dialerProxy"));
+            if (rename.containsKey(t)) so.put("dialerProxy", rename.get(t));
+            else so.remove("dialerProxy"); // unknown chain would stop Xray from starting at all
+        }
+        Map<String, Object> xh = map(st.get("xhttpSettings"));
+        Map<String, Object> extra = xh == null ? null : map(xh.get("extra"));
+        if (extra != null) retagStream(map(extra.get("downloadSettings")), rename);
     }
 
     /* ---------- helpers ---------- */

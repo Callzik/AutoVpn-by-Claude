@@ -58,6 +58,8 @@ public class BoxVpnService extends VpnService {
 
     private ParcelFileDescriptor tunPfd;
     private volatile Process helper;
+    private volatile Process xrayProc;
+    private String xrayConfig;
     private OutputStream helperIn;
     private LocalSocket bindSocket;
     private LocalServerSocket server;
@@ -177,6 +179,9 @@ public class BoxVpnService extends VpnService {
         }
         helper = null;
         helperIn = null;
+        final Process xp = xrayProc;
+        xrayProc = null;
+        if (xp != null) xp.destroy(); // no waiting here: this runs on the main thread
         closeServer();
         if (tunPfd != null) {
             try {
@@ -317,7 +322,11 @@ public class BoxVpnService extends VpnService {
 
     private static String signature(List<Server> list) {
         StringBuilder sb = new StringBuilder();
-        for (Server s : list) sb.append(s.group).append('|').append(s.name).append('|').append(Json.write(s.outbound)).append('\n');
+        for (Server s : list) {
+            sb.append(s.group).append('|').append(s.name).append('|').append(Json.write(s.outbound));
+            if (s.xray != null) sb.append('|').append(Json.write(s.xray));
+            sb.append('\n');
+        }
         return sb.toString();
     }
 
@@ -359,6 +368,7 @@ public class BoxVpnService extends VpnService {
         opt.ruleDir = rulesDir.getAbsolutePath();
         opt.secret = secret;
         opt.initialGroup = group;
+        prepareXray();
         String config = ConfigBuilder.build(servers, opt);
         File cfg = new File(getFilesDir(), "config.json");
         FileOutputStream fo = new FileOutputStream(cfg);
@@ -368,6 +378,7 @@ public class BoxVpnService extends VpnService {
         AppState.phase = "Запускаю ядро";
         AppState.changed();
         if (!running) return;
+        startXray();
         startHelper(cfg);
         long deadline = System.currentTimeMillis() + 25000;
         while (running && !clash.alive()) {
@@ -673,6 +684,7 @@ public class BoxVpnService extends VpnService {
 
     /** Stops the core process and waits for it, without treating that as a crash. */
     private void stopHelper() {
+        stopXray();
         Process p = helper;
         helper = null;
         OutputStream in = helperIn;
@@ -923,6 +935,78 @@ public class BoxVpnService extends VpnService {
             }
         }, "core-log").start();
         pushIface();
+    }
+
+    /* ---------- bundled Xray for transports sing-box lacks (xhttp) ---------- */
+
+    /** Gives every Xray-carried server a local port and fresh credentials; builds the Xray config. */
+    private void prepareXray() {
+        xrayConfig = null;
+        int n = 0;
+        for (Server s : servers) if (s.xray != null && s.group != Server.EXCLUDED) n++;
+        if (n == 0) return;
+        String user = randomHex(6), pass = randomHex(12);
+        int port = 20000 + new SecureRandom().nextInt(20000);
+        List<Server> used = new ArrayList<>();
+        for (Server s : servers) {
+            if (s.xray == null || s.group == Server.EXCLUDED) continue;
+            s.outbound.put("server_port", port++);
+            s.outbound.put("username", user);
+            s.outbound.put("password", pass);
+            used.add(s);
+        }
+        xrayConfig = XrayJson.buildCoreConfig(used, user, pass);
+        AppState.log("xhttp-серверов: " + n + ", они пойдут через ядро Xray");
+    }
+
+    private void startXray() {
+        if (xrayConfig == null) return;
+        try {
+            File work = new File(getFilesDir(), "xray");
+            work.mkdirs();
+            File cfg = new File(work, "config.json");
+            FileOutputStream fo = new FileOutputStream(cfg);
+            fo.write(xrayConfig.getBytes("UTF-8"));
+            fo.close();
+            String bin = getApplicationInfo().nativeLibraryDir + "/libxray.so";
+            ProcessBuilder pb = new ProcessBuilder(bin, "run", "-c", cfg.getAbsolutePath());
+            pb.environment().put("XRAY_LOCATION_ASSET", work.getAbsolutePath());
+            pb.redirectErrorStream(true);
+            pb.directory(work);
+            final Process proc = pb.start();
+            xrayProc = proc;
+            final InputStream out = proc.getInputStream();
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        BufferedReader r = new BufferedReader(new InputStreamReader(out, "UTF-8"));
+                        String line;
+                        while ((line = r.readLine()) != null) {
+                            String l = stripAnsi(line).trim();
+                            if (l.isEmpty() || l.contains("[Info]") || l.contains("[Debug]")) continue;
+                            AppState.log("Xray: " + l);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    if (running && !stopping && xrayProc == proc) {
+                        AppState.log("Ядро Xray остановилось — xhttp-серверы недоступны, остальные работают");
+                    }
+                }
+            }, "xray-log").start();
+        } catch (Exception e) {
+            AppState.log("Не удалось запустить Xray: " + e.getMessage() + " — xhttp-серверы недоступны");
+        }
+    }
+
+    private void stopXray() {
+        final Process p = xrayProc;
+        xrayProc = null;
+        if (p == null) return;
+        p.destroy();
+        try {
+            p.waitFor(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+        }
     }
 
     private static String stripAnsi(String s) {
@@ -1335,8 +1419,8 @@ public class BoxVpnService extends VpnService {
     static String stubReason(List<Server> list) {
         if (list.isEmpty()) return null;
         for (Server s : list) {
-            Object host = s.outbound.get("server");
-            Object port = s.outbound.get("server_port");
+            Object host = s.xray != null ? s.host : s.outbound.get("server");
+            Object port = s.xray != null ? Integer.valueOf(443) : s.outbound.get("server_port");
             String h = host == null ? "" : host.toString();
             int p = port instanceof Number ? ((Number) port).intValue() : 0;
             boolean fake = h.isEmpty() || h.equals("0.0.0.0") || h.startsWith("127.") || h.equals("::") || p <= 1;

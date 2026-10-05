@@ -12,7 +12,7 @@ echo "== resources"
 $T/aapt2 compile --dir res -o $B/res.zip
 $T/aapt2 link -o $B/base.apk -I $ANDROID_JAR --manifest AndroidManifest.xml \
   --java $B/gen -A assets --min-sdk-version 26 --target-sdk-version 33 \
-  --version-code 13 --version-name 1.2 $B/res.zip
+  --version-code 14 --version-name 1.3 $B/res.zip
 
 echo "== java"
 javac -nowarn -encoding UTF-8 --release 8 -Xlint:-options -classpath $ANDROID_JAR -d $B/classes \
@@ -45,6 +45,7 @@ def add(name, path, ctype=zipfile.ZIP_DEFLATED):
         out.writestr(zi, f.read(), compresslevel=9)
 add("classes.dex", "build/classes.dex")
 add("lib/arm64-v8a/libsbhelper.so", "/home/claude/vpn/out/sbhelper-android-arm64")
+add("lib/arm64-v8a/libxray.so", "/home/claude/vpn/out/xray-android-arm64")
 out.close()
 EOF
 
