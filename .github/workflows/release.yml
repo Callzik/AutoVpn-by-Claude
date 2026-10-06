@@ -1,0 +1,24 @@
+# Tag vX.Y -> GitHub Release with apk/AutoVPN-X.Y.apk attached.
+# The APK is built locally by build.sh and committed before tagging.
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VER=${TAG#v}
+          APK=apk/AutoVPN-$VER.apk
+          test -f "$APK" || { echo "missing $APK"; exit 1; }
+          cp "$APK" AutoVPN.apk
+          NOTES=$(git log -1 --format=%s "$TAG")
+          gh release create "$TAG" "$APK" AutoVPN.apk --title "AutoVPN $VER" --notes "$NOTES" --latest

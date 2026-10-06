@@ -4,6 +4,9 @@ set -euo pipefail
 export JAVA_TOOL_OPTIONS=
 cd "$(dirname "$0")"
 T=/home/claude/vpn/tools
+VERSION=${VERSION:?set VERSION, e.g. VERSION=1.7}
+VERSION_CODE=${VERSION_CODE:?set VERSION_CODE, e.g. VERSION_CODE=18}
+: "${AUTOVPN_KS_PASS:?set AUTOVPN_KS_PASS (keystore password)}"
 ANDROID_JAR=$T/platforms/android-34/android.jar
 B=build
 rm -rf $B && mkdir -p $B/gen $B/classes $B/apk
@@ -12,7 +15,7 @@ echo "== resources"
 $T/aapt2 compile --dir res -o $B/res.zip
 $T/aapt2 link -o $B/base.apk -I $ANDROID_JAR --manifest AndroidManifest.xml \
   --java $B/gen -A assets --min-sdk-version 26 --target-sdk-version 33 \
-  --version-code 17 --version-name 1.6 $B/res.zip
+  --version-code $VERSION_CODE --version-name $VERSION $B/res.zip
 
 echo "== java"
 javac -nowarn -encoding UTF-8 --release 8 -Xlint:-options -classpath $ANDROID_JAR -d $B/classes \
@@ -52,11 +55,11 @@ EOF
 echo "== sign"
 KS=/home/claude/vpn/autovpn.keystore
 if [ ! -f $KS ]; then
-  keytool -genkeypair -keystore $KS -storepass autovpn123 -keypass autovpn123 -alias autovpn \
+  keytool -genkeypair -keystore $KS -storepass:env AUTOVPN_KS_PASS -keypass:env AUTOVPN_KS_PASS -alias autovpn \
     -keyalg RSA -keysize 3072 -validity 10000 -dname "CN=AutoVPN" >/dev/null 2>&1
 fi
-java -jar $T/apksigner.jar sign --ks $KS --ks-pass pass:autovpn123 --ks-key-alias autovpn \
+java -jar $T/apksigner.jar sign --ks $KS --ks-pass env:AUTOVPN_KS_PASS --key-pass env:AUTOVPN_KS_PASS --ks-key-alias autovpn \
   --min-sdk-version 26 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
-  --out $B/AutoVPN.apk $B/unsigned.apk
-java -jar $T/apksigner.jar verify -v $B/AutoVPN.apk | head -6
-ls -la $B/AutoVPN.apk
+  --out apk/AutoVPN-$VERSION.apk $B/unsigned.apk
+java -jar $T/apksigner.jar verify -v apk/AutoVPN-$VERSION.apk | head -6
+ls -la apk/AutoVPN-$VERSION.apk
