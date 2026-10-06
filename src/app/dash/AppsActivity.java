@@ -83,7 +83,7 @@ public class AppsActivity extends Activity {
         search.setHint("Поиск");
         search.setSingleLine(true);
         search.setTextColor(Ui.FG);
-        search.setHintTextColor(0xFF8A919C);
+        search.setHintTextColor(0xFF8E8AA3);
         search.setTextSize(15);
         search.setBackground(Ui.round(c, Ui.SURFACE2, 12, 0));
         search.setPadding(Ui.dp(c, 12), Ui.dp(c, 10), Ui.dp(c, 12), Ui.dp(c, 10));

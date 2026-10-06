@@ -11,16 +11,16 @@ import android.widget.TextView;
 
 /** Colours and small view factories shared by the screens. */
 final class Ui {
-    static final int BG = 0xFF0E1013;
-    static final int SURFACE = 0xFF171A1F;
-    static final int SURFACE2 = 0xFF1F232A;
-    static final int LINE = 0xFF2A2F37;
-    static final int LINE2 = 0xFF3A404A;
-    static final int FG = 0xFFECEEF1;
-    static final int MUTED = 0xFF9AA1AC;
-    static final int ACCENT = 0xFF3DD68C;
-    static final int ACCENT_INK = 0xFF06281A;
-    static final int ACCENT_TINT = 0xFF12261C;
+    static final int BG = 0xFF0B0B0F;
+    static final int SURFACE = 0xFF13121A;
+    static final int SURFACE2 = 0xFF1C1A26;
+    static final int LINE = 0xFF24222E;
+    static final int LINE2 = 0xFF34313F;
+    static final int FG = 0xFFF2F2F5;
+    static final int MUTED = 0xFF9C98B0;
+    static final int ACCENT = 0xFF8B7CFF;
+    static final int ACCENT_INK = 0xFF0B0B0F;
+    static final int ACCENT_TINT = 0xFF1E1A38;
     static final int WARN = 0xFFF2B544;
     static final int WARN_TINT = 0xFF2A2213;
     static final int WARN_FG = 0xFFF1E3C4;

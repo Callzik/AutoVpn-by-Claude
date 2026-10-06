@@ -67,7 +67,7 @@ public class SettingsActivity extends Activity {
 
         subInput = new EditText(c);
         subInput.setTextColor(Ui.FG);
-        subInput.setHintTextColor(0xFF8A919C);
+        subInput.setHintTextColor(0xFF8E8AA3);
         subInput.setHint("Ещё одна ссылка: https://… или vless://…");
         subInput.setTypeface(Typeface.MONOSPACE);
         subInput.setTextSize(13);

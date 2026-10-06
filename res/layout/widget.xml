@@ -32,7 +32,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Выключен"
-            android:textColor="#FFECEEF1"
+            android:textColor="#FFF2F2F5"
             android:textSize="15sp"
             android:textStyle="bold"
             android:maxLines="1"
@@ -43,7 +43,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Нажмите, чтобы включить"
-            android:textColor="#FF9AA1AC"
+            android:textColor="#FF9C98B0"
             android:textSize="13sp"
             android:maxLines="1"
             android:ellipsize="end" />

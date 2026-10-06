@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -33,7 +34,6 @@ public class MainActivity extends Activity {
     private View mainView, onboardingView;
 
     private TextView netChip, title, subtitle, banner, wlBadge, srvName, srvSub, srvBadge, pingBtn, errorText;
-    private View wlDot;
     private PowerButton power;
     private EditText subInput;
     private TextView subError;
@@ -110,38 +110,43 @@ public class MainActivity extends Activity {
         sv.setFillViewport(true);
         LinearLayout col = new LinearLayout(c);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.setPadding(Ui.dp(c, 20), Ui.dp(c, 20), Ui.dp(c, 20), Ui.dp(c, 24));
+        col.setPadding(Ui.dp(c, 22), Ui.dp(c, 22), Ui.dp(c, 22), Ui.dp(c, 22));
         sv.addView(col, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        // header: comet logo + wordmark + settings
         LinearLayout top = Ui.row(c);
-        netChip = Ui.text(c, "Wi-Fi", 14, Ui.FG, true);
-        netChip.setBackground(Ui.round(c, Ui.SURFACE, 18, Ui.LINE));
-        netChip.setPadding(Ui.dp(c, 14), Ui.dp(c, 8), Ui.dp(c, 14), Ui.dp(c, 8));
-        top.addView(netChip);
-        // fixed 1px height: a plain View with WRAP_CONTENT would take the whole screen height
-        TextView ver = Ui.text(c, "v" + versionName(), 12, Ui.MUTED, false);
-        ver.setGravity(Gravity.CENTER);
-        top.addView(ver, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView settings = Ui.text(c, "Настройки", 14, Ui.FG, true);
-        settings.setBackground(Ui.round(c, Ui.SURFACE, 18, Ui.LINE));
-        settings.setPadding(Ui.dp(c, 14), Ui.dp(c, 10), Ui.dp(c, 14), Ui.dp(c, 10));
+        ImageView logo = new ImageView(c);
+        logo.setImageResource(R.drawable.ic_logo);
+        top.addView(logo, new LinearLayout.LayoutParams(Ui.dp(c, 30), Ui.dp(c, 30)));
+        TextView word = Ui.text(c, "dash", 24, Ui.FG, true);
+        word.setLetterSpacing(-0.02f);
+        word.setPadding(Ui.dp(c, 10), 0, Ui.dp(c, 8), 0);
+        top.addView(word);
+        netChip = Ui.text(c, "v" + versionName(), 12, Ui.MUTED, false);
+        top.addView(netChip, Ui.weight());
+        FrameLayout settings = new FrameLayout(c);
+        settings.setBackground(Ui.round(c, Ui.SURFACE, 14, Ui.LINE));
+        settings.addView(new SlidersIcon(c), new FrameLayout.LayoutParams(Ui.dp(c, 20), Ui.dp(c, 20), Gravity.CENTER));
+        settings.setContentDescription("Настройки");
         settings.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); }
         });
-        top.addView(settings);
+        top.addView(settings, new LinearLayout.LayoutParams(Ui.dp(c, 44), Ui.dp(c, 44)));
         col.addView(top);
 
+        // hero: orbit button + status + timer
         LinearLayout hero = new LinearLayout(c);
         hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER_HORIZONTAL);
+        hero.setGravity(Gravity.CENTER);
         power = new PowerButton(c);
         power.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { toggle(); }
         });
-        hero.addView(power, new LinearLayout.LayoutParams(Ui.dp(c, 264), Ui.dp(c, 264)));
-        title = Ui.text(c, "Отключено", 28, Ui.FG, true);
+        hero.addView(power, new LinearLayout.LayoutParams(Ui.dp(c, 270), Ui.dp(c, 270)));
+        title = Ui.text(c, "Отключено", 32, Ui.FG, true);
+        title.setLetterSpacing(-0.02f);
         title.setGravity(Gravity.CENTER);
-        hero.addView(title, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 18));
+        hero.addView(title, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 14));
         subtitle = Ui.text(c, "", 15, Ui.MUTED, false);
         subtitle.setGravity(Gravity.CENTER);
         hero.addView(subtitle, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 6));
@@ -149,9 +154,8 @@ public class MainActivity extends Activity {
         errorText.setGravity(Gravity.CENTER);
         hero.addView(errorText, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
         LinearLayout.LayoutParams heroLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        heroLp.topMargin = Ui.dp(c, 16);
-        hero.setMinimumHeight(Ui.dp(c, 400));
-        hero.setPadding(0, Ui.dp(c, 12), 0, Ui.dp(c, 12));
+        hero.setMinimumHeight(Ui.dp(c, 420));
+        hero.setPadding(0, Ui.dp(c, 8), 0, Ui.dp(c, 12));
         col.addView(hero, heroLp);
 
         banner = Ui.text(c, "", 13, Ui.WARN_FG, false);
@@ -159,66 +163,90 @@ public class MainActivity extends Activity {
         banner.setVisibility(View.GONE);
         col.addView(banner, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0));
 
-        // white lists: one minimal line
-        LinearLayout wl = Ui.row(c);
-        wl.setBackground(Ui.round(c, Ui.SURFACE, 16, Ui.LINE));
-        wl.setPadding(Ui.dp(c, 16), Ui.dp(c, 12), Ui.dp(c, 16), Ui.dp(c, 12));
-        wlDot = new View(c);
-        wl.addView(wlDot, new LinearLayout.LayoutParams(Ui.dp(c, 8), Ui.dp(c, 8)));
-        TextView wlTitle = Ui.text(c, "Белые списки", 15, Ui.FG, true);
-        wlTitle.setPadding(Ui.dp(c, 10), 0, 0, 0);
-        wl.addView(wlTitle, Ui.weight());
-        wlBadge = Ui.text(c, "—", 15, Ui.MUTED, true);
-        wl.addView(wlBadge);
-        col.addView(wl, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
-
-        // server
-        LinearLayout srv = Ui.card(c);
-        srv.setPadding(Ui.dp(c, 16), Ui.dp(c, 16), Ui.dp(c, 16), Ui.dp(c, 16));
-        LinearLayout srvRow = Ui.row(c);
-        LinearLayout srvText = new LinearLayout(c);
-        srvText.setOrientation(LinearLayout.VERTICAL);
-        srvName = Ui.text(c, "Автовыбор сервера", 17, Ui.FG, true);
-        srvSub = Ui.text(c, "", 14, Ui.MUTED, false);
-        srvText.addView(srvName);
-        srvText.addView(srvSub);
-        srvRow.addView(srvText, Ui.weight());
-        srvBadge = Ui.badge(c);
-        srvRow.addView(srvBadge);
-        srv.addView(srvRow);
-        srv.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, ServersActivity.class)); }
-        });
-        LinearLayout srvBottom = Ui.row(c);
-        TextView srvHint = Ui.text(c, "Все серверы  ›", 14, Ui.ACCENT, false);
-        srvBottom.addView(srvHint, Ui.weight());
-        pingBtn = Ui.text(c, "Пинг", 14, Ui.FG, true);
-        pingBtn.setGravity(Gravity.CENTER);
-        pingBtn.setBackground(Ui.round(c, Ui.SURFACE2, 14, Ui.LINE2));
-        pingBtn.setPadding(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), Ui.dp(c, 8));
-        pingBtn.setMinWidth(Ui.dp(c, 96));
-        pingBtn.setOnClickListener(new View.OnClickListener() {
+        // tiles: ping (tap = re-ping), alive, white lists
+        LinearLayout tiles = new LinearLayout(c);
+        tiles.setOrientation(LinearLayout.HORIZONTAL);
+        pingBtn = tile(tiles, "Пинг", true);
+        ((View) pingBtn.getParent()).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 BoxVpnService s = BoxVpnService.instance;
                 if (s != null && AppState.vpn == AppState.ON) s.pingCurrent();
             }
         });
-        srvBottom.addView(pingBtn);
-        srv.addView(srvBottom, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
-        col.addView(srv, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
+        srvBadge = tile(tiles, "Живых", true);
+        wlBadge = tile(tiles, "Белые списки", false);
+        col.addView(tiles, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
+
+        // server card
+        LinearLayout srv = Ui.row(c);
+        srv.setBackground(Ui.round(c, Ui.SURFACE, 18, Ui.LINE));
+        srv.setPadding(Ui.dp(c, 16), Ui.dp(c, 16), Ui.dp(c, 14), Ui.dp(c, 16));
+        LinearLayout srvText = new LinearLayout(c);
+        srvText.setOrientation(LinearLayout.VERTICAL);
+        srvName = Ui.text(c, "Автовыбор сервера", 16, Ui.FG, true);
+        srvName.setSingleLine(true);
+        srvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        srvSub = Ui.text(c, "", 13, Ui.MUTED, false);
+        srvSub.setSingleLine(true);
+        srvSub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        srvText.addView(srvName);
+        srvText.addView(srvSub, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
+        srv.addView(srvText, Ui.weight());
+        srv.addView(Ui.text(c, "›", 24, Ui.MUTED, false));
+        srv.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, ServersActivity.class)); }
+        });
+        col.addView(srv, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
 
         return sv;
+    }
+
+    /** One stat tile; returns its value TextView. */
+    private TextView tile(LinearLayout parent, String label, boolean mono) {
+        Context c = this;
+        LinearLayout t = new LinearLayout(c);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setBackground(Ui.round(c, Ui.SURFACE, 16, Ui.LINE));
+        t.setPadding(Ui.dp(c, 14), Ui.dp(c, 12), Ui.dp(c, 10), Ui.dp(c, 12));
+        TextView l = Ui.text(c, label, 12, Ui.MUTED, false);
+        l.setSingleLine(true);
+        l.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(l);
+        TextView v = Ui.text(c, "—", mono ? 20 : 18, Ui.FG, true);
+        if (mono) v.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+        v.setSingleLine(true);
+        t.addView(v, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        if (parent.getChildCount() > 0) lp.leftMargin = Ui.dp(c, 10);
+        parent.addView(t, lp);
+        return v;
+    }
+
+    /** Settings glyph: two slider lines. */
+    static class SlidersIcon extends View {
+        private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        SlidersIcon(Context c) {
+            super(c);
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            p.setStrokeWidth(Ui.dp(c, 2));
+            p.setColor(Ui.FG);
+        }
+        @Override protected void onDraw(android.graphics.Canvas cv) {
+            float u = getWidth() / 24f;
+            cv.drawLine(4 * u, 7 * u, 14 * u, 7 * u, p);
+            cv.drawLine(18 * u, 7 * u, 20 * u, 7 * u, p);
+            cv.drawLine(4 * u, 17 * u, 8 * u, 17 * u, p);
+            cv.drawLine(12 * u, 17 * u, 20 * u, 17 * u, p);
+            cv.drawCircle(16 * u, 7 * u, 2 * u, p);
+            cv.drawCircle(10 * u, 17 * u, 2 * u, p);
+        }
     }
 
     private void render() {
         if (title == null) return;
         int s = AppState.vpn;
         power.setState(s);
-
-        String net = AppState.net;
-        if (s == AppState.OFF) net = currentNetGuess();
-        netChip.setText("wifi".equals(net) ? "Wi-Fi" : "cell".equals(net) ? "Мобильная сеть" : "none".equals(net) ? "Нет сети" : "Сеть");
-        netChip.setTextColor("cell".equals(net) ? Ui.WARN : "none".equals(net) ? Ui.BAD : Ui.FG);
 
         title.setTextColor(s == AppState.WAITING ? Ui.WARN : Ui.FG);
         subtitle.setTypeface(s == AppState.ON ? Typeface.MONOSPACE : Typeface.DEFAULT);
@@ -237,7 +265,8 @@ public class MainActivity extends Activity {
                 break;
             default:
                 title.setText("Отключено");
-                subtitle.setText("Нажмите, чтобы включить");
+                String net = currentNetGuess();
+                subtitle.setText("none".equals(net) ? "Нет сети" : "Нажмите, чтобы включить");
         }
         errorText.setText(s == AppState.OFF ? AppState.error : "");
         errorText.setVisibility(s == AppState.OFF && !AppState.error.isEmpty() ? View.VISIBLE : View.GONE);
@@ -249,57 +278,45 @@ public class MainActivity extends Activity {
             banner.setText(AppState.banner);
             boolean ok = AppState.bannerTone == 1;
             banner.setBackground(Ui.round(this, ok ? Ui.ACCENT_TINT : Ui.WARN_TINT, 14, 0));
-            banner.setTextColor(ok ? 0xFFCFEFDD : Ui.WARN_FG);
+            banner.setTextColor(ok ? 0xFFD9D3FF : Ui.WARN_FG);
         }
 
-        // white lists
-        int wlColor;
-        if (AppState.wlChecking || AppState.wl == AppState.WL_UNKNOWN) {
-            wlBadge.setText(AppState.wlChecking ? "проверка…" : "—");
-            wlColor = Ui.MUTED;
-        } else if (AppState.wl == AppState.WL_ON) {
-            wlBadge.setText("вкл");
-            wlColor = Ui.WARN;
-        } else if (AppState.wl == AppState.WL_OFF && AppState.regularBlocked && s != AppState.OFF) {
-            wlBadge.setText("выкл · блокировка");
-            wlColor = Ui.WARN;
-        } else if (AppState.wl == AppState.WL_OFF) {
-            wlBadge.setText("выкл");
-            wlColor = Ui.ACCENT;
-        } else {
-            wlBadge.setText("нет сети");
-            wlColor = Ui.BAD;
-        }
-        wlBadge.setTextColor(wlColor);
-        wlDot.setBackground(Ui.round(this, wlColor, 4, 0));
-
-        // server
-        pingBtn.setVisibility(s == AppState.ON ? View.VISIBLE : View.GONE);
-        pingBtn.setText(AppState.pingingCurrent ? "…" : AppState.ping > 0 ? AppState.ping + " мс" : "Пинг");
-        pingBtn.setTextColor(AppState.pingingCurrent || AppState.ping <= 0 ? Ui.FG
+        // tile: ping
+        boolean on = s == AppState.ON;
+        pingBtn.setText(!on ? "—" : AppState.pingingCurrent ? "…" : AppState.ping > 0 ? String.valueOf(AppState.ping) : "—");
+        pingBtn.setTextColor(!on || AppState.pingingCurrent || AppState.ping <= 0 ? Ui.FG
                 : AppState.ping < 150 ? Ui.ACCENT : AppState.ping < 400 ? Ui.WARN : Ui.BAD);
-        if (s == AppState.ON && !AppState.serverName.isEmpty()) {
+
+        // tile: alive servers
+        srvBadge.setText(s != AppState.OFF && AppState.alive > 0 ? String.valueOf(AppState.alive) : "—");
+
+        // tile: white lists
+        int wlColor = Ui.FG;
+        if (AppState.wlChecking) wlBadge.setText("…");
+        else if (AppState.wl == AppState.WL_ON) { wlBadge.setText("вкл"); wlColor = Ui.WARN; }
+        else if (AppState.wl == AppState.WL_OFF && AppState.regularBlocked && s != AppState.OFF) { wlBadge.setText("блок"); wlColor = Ui.WARN; }
+        else if (AppState.wl == AppState.WL_OFF) wlBadge.setText("выкл");
+        else if (AppState.wl == AppState.WL_NONET) { wlBadge.setText("нет сети"); wlColor = Ui.BAD; }
+        else wlBadge.setText("—");
+        wlBadge.setTextColor(wlColor);
+
+        // server card
+        boolean manual = !AppState.pinned.isEmpty();
+        String grp = "auto-lte".equals(AppState.group) ? "LTE" : "основные";
+        if (on && !AppState.serverName.isEmpty()) {
             srvName.setText(AppState.serverName);
-            String ping = AppState.ping > 0 ? AppState.ping + " мс" : "пинг —";
-            boolean manual = !AppState.pinned.isEmpty();
-            srvSub.setText((manual ? "Выбран вручную" : "Лучший из " + AppState.alive) + " · " + ping + " · " + ("auto-lte".equals(AppState.group) ? "LTE" : "обычные"));
-            srvBadge.setVisibility(View.VISIBLE);
-            srvBadge.setText(AppState.switching ? "Проверка…" : manual ? "Вручную" : "Авто");
-            Ui.tone(this, srvBadge, AppState.switching ? Ui.TONE_NEUTRAL : manual ? Ui.TONE_WARN : Ui.TONE_OK);
+            srvSub.setText(AppState.switching ? "Проверка серверов…"
+                    : manual ? "Выбран вручную" : "Лучший из " + AppState.alive + " · " + grp);
         } else if (s == AppState.CONNECTING) {
-            srvName.setText("Выбираю сервер…");
+            srvName.setText("Выбор сервера…");
             srvSub.setText(AppState.lastServers);
-            srvBadge.setVisibility(View.GONE);
         } else if (s == AppState.WAITING) {
             srvName.setText("Сервер не выбран");
-            srvSub.setText("Выбор сервера после появления связи");
-            srvBadge.setVisibility(View.GONE);
+            srvSub.setText("Выбор после появления связи");
         } else {
-            srvName.setText("Автовыбор сервера");
-            srvSub.setText("Подключение к самому быстрому");
-            srvBadge.setVisibility(View.GONE);
+            srvName.setText(manual ? AppState.pinned : "Автовыбор сервера");
+            srvSub.setText(manual ? "Выбран вручную" : "Самый быстрый из доступных");
         }
-
     }
 
     private String currentNetGuess() {
@@ -381,7 +398,7 @@ public class MainActivity extends Activity {
         col.addView(Ui.text(c, "Ссылка", 14, Ui.FG, true), Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 28));
         subInput = new EditText(c);
         subInput.setHint("https://… или vless://…");
-        subInput.setHintTextColor(0xFF8A919C);
+        subInput.setHintTextColor(0xFF8E8AA3);
         subInput.setTextColor(Ui.FG);
         subInput.setTypeface(Typeface.MONOSPACE);
         subInput.setTextSize(14);
