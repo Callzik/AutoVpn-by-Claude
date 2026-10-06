@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AutoVPN</title>
+<title>Dash</title>
 <style>
 :root{
   --bg:#0E1013;--surface:#171A1F;--surface2:#1F232A;--line:#2A2F37;--line2:#3A404A;
@@ -157,7 +157,7 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
     </div>
     <div class="section">Запуск</div>
     <div class="card">
-      <div class="row"><div class="grow"><div class="b">Подключаться при запуске</div><div class="m">Сразу включать VPN, когда открывается AutoVPN</div></div><div class="switch" id="sw-as" onclick="setAuto(this)"></div></div>
+      <div class="row"><div class="grow"><div class="b">Подключаться при запуске</div><div class="m">Сразу включать VPN, когда открывается Dash</div></div><div class="switch" id="sw-as" onclick="setAuto(this)"></div></div>
     </div>
     <div class="section">Журнал</div>
     <div class="card">
@@ -165,7 +165,7 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
       <pre class="log" id="log" style="margin-top:10px;max-height:300px;overflow:auto"></pre>
     </div>
     <div class="section">О приложении</div>
-    <div class="card"><div class="m">AutoVPN для Windows · ядра sing-box и Xray-core · создано с помощью Claude.<br>Весь трафик ПК идёт через VPN-адаптер, российские сайты — напрямую. Упавшее ядро перезапускается само, после сна соединение проверяется заново.</div>
+    <div class="card"><div class="m">Dash для Windows · ядра sing-box и Xray-core · создано с помощью Claude.<br>Весь трафик ПК идёт через VPN-адаптер, российские сайты — напрямую. Упавшее ядро перезапускается само, после сна соединение проверяется заново.</div>
       <button class="secondary" style="width:100%;margin-top:12px" onclick="api('/api/quit')">Отключить и выйти</button></div>
   </div>
 </section>

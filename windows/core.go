@@ -255,7 +255,7 @@ func (c *Core) fetch(u string) (string, string, error) {
 	req.Header.Set("x-device-os", "Windows")
 	req.Header.Set("x-ver-os", osVersion())
 	req.Header.Set("x-device-model", deviceModel())
-	req.Header.Set("x-app-version", "AutoVPN-Windows/"+Version)
+	req.Header.Set("x-app-version", "Dash-Windows/"+Version)
 	resp, err := httpDirect.Do(req)
 	if err != nil {
 		return "", "", err
@@ -559,7 +559,7 @@ func (c *Core) startSingBox(g int, servers []*Server, group string, idx int) (ok
 	cfg, err := BuildSingBox(servers, BuildOptions{
 		RuDirect: c.prefs.Get().RuDirect, BlockedVPN: c.prefs.Get().BlockedVPN,
 		RuleDir: c.ruleDir, Secret: secret, ClashPort: port, InitialGroup: group,
-		TunName: "AutoVPN", TunAddr4: tunAddrs[idx][0], TunAddr6: tunAddrs[idx][1], BypassProcs: bypassProcs()})
+		TunName: "Dash", TunAddr4: tunAddrs[idx][0], TunAddr6: tunAddrs[idx][1], BypassProcs: bypassProcs()})
 	if err != nil {
 		return false, false, err
 	}

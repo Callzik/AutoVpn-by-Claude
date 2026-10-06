@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-const Version = "1.1"
+const Version = "1.2"
 
 //go:embed assets/rules/*.srs
 var rulesFS embed.FS
@@ -56,7 +56,7 @@ func NewApp(binDir string) (*App, error) {
 		return nil, err
 	}
 	a.Addr = addr
-	a.Log.Add("AutoVPN " + Version + " для Windows")
+	a.Log.Add("Dash " + Version + " для Windows")
 	if d := a.Prefs.Get(); d.AutoStart && len(d.Subs) > 0 {
 		a.Core.Connect()
 	}

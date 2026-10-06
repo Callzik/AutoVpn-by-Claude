@@ -1393,7 +1393,7 @@ public class BoxVpnService extends VpnService {
             c.setRequestProperty("x-device-os", "Android");
             c.setRequestProperty("x-ver-os", Build.VERSION.RELEASE);
             c.setRequestProperty("x-device-model", (Build.MANUFACTURER + " " + Build.MODEL).trim());
-            c.setRequestProperty("x-app-version", "AutoVPN/1.0");
+            c.setRequestProperty("x-app-version", "Dash/1.7");
             int code = c.getResponseCode();
             if (code != 200) throw new Exception("HTTP " + code);
             String body = Clash.read(c.getInputStream());

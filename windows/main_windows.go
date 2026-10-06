@@ -29,17 +29,17 @@ var (
 
 func msgBox(text string) {
 	t, _ := windows.UTF16PtrFromString(text)
-	c, _ := windows.UTF16PtrFromString("AutoVPN")
+	c, _ := windows.UTF16PtrFromString("Dash")
 	procMessageBox.Call(0, uintptr(unsafe.Pointer(t)), uintptr(unsafe.Pointer(c)), 0x40)
 }
 
 // one copy only: a second launch brings the running window forward
 func singleInstance() bool {
-	name, _ := windows.UTF16PtrFromString("Local\\AutoVPN-by-Claude")
+	name, _ := windows.UTF16PtrFromString("Local\\Dash-by-Claude")
 	_, err := windows.CreateMutex(nil, false, name)
 	if err == windows.ERROR_ALREADY_EXISTS {
 		cls, _ := windows.UTF16PtrFromString("webview")
-		title, _ := windows.UTF16PtrFromString("AutoVPN")
+		title, _ := windows.UTF16PtrFromString("Dash")
 		if h, _, _ := procFindWindow.Call(uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(title))); h != 0 {
 			procShowWindow.Call(h, 9) // SW_RESTORE
 			procSetForegroun.Call(h)
@@ -62,7 +62,7 @@ func writeIfChanged(path string, data []byte) error {
 	return os.Rename(tmp, path)
 }
 
-/* child processes die together with AutoVPN, even if it is killed */
+/* child processes die together with Dash, even if it is killed */
 
 var job windows.Handle
 
@@ -98,7 +98,7 @@ func main() {
 		return
 	}
 	if !windows.GetCurrentProcessToken().IsElevated() {
-		msgBox("AutoVPN нужен запуск от имени администратора: без этого Windows не даёт создать VPN-подключение.")
+		msgBox("Dash нужен запуск от имени администратора: без этого Windows не даёт создать VPN-подключение.")
 		return
 	}
 	initJob()
@@ -121,7 +121,7 @@ func main() {
 		AutoFocus: true,
 		DataPath:  filepath.Join(app.Dir, "webview"),
 		WindowOptions: webview2.WindowOptions{
-			Title: "AutoVPN", Width: 440, Height: 820, IconId: 2, Center: true,
+			Title: "Dash", Width: 440, Height: 820, IconId: 2, Center: true,
 		},
 	})
 	if w == nil {

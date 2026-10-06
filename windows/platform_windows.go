@@ -17,7 +17,7 @@ const (
 	xrayExe    = "xray.exe"
 )
 
-func bypassProcs() []string { return []string{"xray.exe", "AutoVPN.exe"} }
+func bypassProcs() []string { return []string{"xray.exe", "Dash.exe"} }
 
 func hideWindow(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
@@ -59,7 +59,14 @@ func deviceModel() string {
 
 func dataRoot() string {
 	if d := os.Getenv("LOCALAPPDATA"); d != "" {
-		return d + `\AutoVPN`
+		dir := d + `\Dash`
+		// settings of the AutoVPN-named versions move over once
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if _, err := os.Stat(d + `\AutoVPN`); err == nil {
+				_ = os.Rename(d+`\AutoVPN`, dir)
+			}
+		}
+		return dir
 	}
-	return `C:\AutoVPN`
+	return `C:\Dash`
 }
