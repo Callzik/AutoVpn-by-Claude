@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoVPN</title>
+<style>
+:root{
+  --bg:#0E1013;--surface:#171A1F;--surface2:#1F232A;--line:#2A2F37;--line2:#3A404A;
+  --fg:#ECEEF1;--muted:#9AA1AC;--accent:#3DD68C;--accent-ink:#06281A;--accent-tint:#12261C;
+  --warn:#F2B544;--warn-tint:#2A2213;--warn-fg:#F1E3C4;--bad:#F0716B;--bad-tint:#2C1716;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--fg);font:15px/1.4 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit}
+.view{position:absolute;inset:0;display:none;flex-direction:column;padding:18px 18px 16px;overflow:hidden}
+.view.on{display:flex}
+.top{display:flex;align-items:center;gap:10px;min-height:40px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:8px 14px;font-weight:600;font-size:14px}
+.chip:hover{border-color:var(--line2)}
+.ver{flex:1;text-align:center;color:var(--muted);font-size:12px}
+.back{font-size:22px;padding:2px 12px 2px 2px}
+h1{font-size:21px;font-weight:700;flex:1}
+.scroll{overflow-y:auto;flex:1;margin-top:12px;padding-right:2px}
+.scroll::-webkit-scrollbar{width:6px}.scroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+
+/* hero */
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:330px}
+.power{position:relative;width:236px;height:236px;border-radius:50%;cursor:pointer}
+.power .ring{position:absolute;inset:0;border-radius:50%;border:1px solid var(--line)}
+.power .ring2{position:absolute;inset:18px;border-radius:50%;border:1px solid var(--line)}
+.power .btn{position:absolute;inset:36px;border-radius:50%;background:var(--surface);border:2px solid var(--line2);display:grid;place-items:center;transition:background .3s,border-color .3s,box-shadow .3s}
+.power svg.icon{width:60px;height:60px;stroke:var(--muted);transition:stroke .3s}
+.power .arc{position:absolute;inset:26px;border-radius:50%;border:2.5px solid transparent;border-top-color:var(--accent);opacity:0;animation:spin .9s linear infinite}
+.power .pulse{position:absolute;inset:20px;border-radius:50%;border:1px solid var(--accent);opacity:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%{transform:scale(.85);opacity:.5}100%{transform:scale(1.12);opacity:0}}
+@keyframes breathe{0%,100%{opacity:.35}50%{opacity:.8}}
+.st-connecting .arc,.st-waiting .arc{opacity:1}
+.st-waiting .arc{border-top-color:var(--warn);animation-duration:2s}
+.st-connecting .pulse{animation:pulse 1.6s ease-out infinite}
+.st-connecting .btn{border-color:rgba(61,214,140,.5)}
+.st-connecting svg.icon{stroke:var(--accent)}
+.st-on .btn{background:var(--accent-tint);border-color:var(--accent);box-shadow:0 0 34px rgba(61,214,140,.28)}
+.st-on svg.icon{stroke:var(--accent)}
+.st-on .ring,.st-on .ring2{border-color:rgba(61,214,140,.32)}
+.st-on .ring{animation:breathe 3.2s ease-in-out infinite}
+.st-waiting .btn{background:var(--warn-tint);border-color:rgba(242,181,68,.5)}
+.st-waiting svg.icon{stroke:var(--warn)}
+.title{font-size:28px;font-weight:700;margin-top:16px}
+.subtitle{color:var(--muted);margin-top:4px;text-align:center;min-height:21px;max-width:360px}
+.subtitle.mono{font-family:Consolas,"Cascadia Mono",monospace;font-size:15px}
+.err{color:var(--bad);font-size:14px;margin-top:8px;text-align:center;max-width:360px}
+.banner{border-radius:14px;padding:10px 14px;font-size:13px;margin-bottom:10px;background:var(--warn-tint);color:var(--warn-fg)}
+.banner.ok{background:var(--accent-tint);color:#CFEFDD}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.card+.card{margin-top:12px}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.dot{width:8px;height:8px;border-radius:4px;background:var(--muted)}
+.b{font-weight:600}
+.m{color:var(--muted);font-size:13px}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{border-radius:14px;padding:4px 10px;font-size:13px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.badge.ok{background:var(--accent-tint);color:var(--accent)}
+.badge.warn{background:var(--warn-tint);color:var(--warn)}
+.link{color:var(--accent);font-size:14px}
+.pbtn{background:var(--surface2);border:1px solid var(--line2);border-radius:14px;padding:7px 16px;font-weight:600;min-width:96px}
+.pbtn:hover{border-color:#4a515c}
+.clickable{cursor:pointer}.clickable:hover{border-color:var(--line2)}
+
+/* lists */
+.item{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer;min-height:54px}
+.item:hover{background:rgba(255,255,255,.02)}
+.item.off{opacity:.45}
+.pv{font-weight:600;font-size:14px;white-space:nowrap}
+.good{color:var(--accent)}.mid{color:var(--warn)}.bad{color:var(--bad)}
+.primary{background:var(--accent);color:var(--accent-ink);border-radius:16px;height:52px;font-weight:700;font-size:16px;width:100%}
+.secondary{background:var(--surface);border:1px solid var(--line);border-radius:14px;height:44px;font-weight:600;padding:0 16px}
+.secondary:hover{border-color:var(--line2)}
+.field{width:100%;background:var(--surface2);border:1px solid transparent;border-radius:12px;padding:11px 12px;color:var(--fg);font-family:Consolas,monospace;font-size:13px;outline:none;-webkit-user-select:text;user-select:text}
+.field:focus{border-color:var(--line2)}
+.section{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:22px 4px 8px}
+.switch{position:relative;width:42px;height:24px;border-radius:12px;background:var(--line2);transition:background .2s;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:9px;background:#fff;transition:transform .2s}
+.switch.on{background:var(--accent)}.switch.on::after{transform:translateX(18px)}
+.x{color:var(--muted);font-size:18px;padding:4px 6px 4px 14px}
+.x:hover{color:var(--bad)}
+pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word;-webkit-user-select:text;user-select:text}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2d323a;color:var(--fg);padding:9px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%}
+.toast.on{opacity:1}
+.menu{position:fixed;background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:4px;display:none;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.menu button{display:block;width:100%;text-align:left;padding:8px 14px;border-radius:8px;font-size:14px}
+.menu button:hover{background:var(--line)}
+</style>
+</head>
+<body>
+
+<!-- main -->
+<section class="view" id="v-main">
+  <div class="top">
+    <span class="chip" id="netchip">ПК</span>
+    <span class="ver" id="ver"></span>
+    <button class="chip" onclick="show('settings')">Настройки</button>
+  </div>
+  <div class="hero">
+    <div class="power st-off" id="power" onclick="api('/api/toggle').then(poll)" title="Подключить / отключить">
+      <div class="ring"></div><div class="ring2"></div><div class="pulse"></div><div class="arc"></div>
+      <div class="btn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M17.7 6.6a8 8 0 1 1-11.4 0"/></svg></div>
+    </div>
+    <div class="title" id="title">Отключено</div>
+    <div class="subtitle" id="subtitle">Нажмите, чтобы включить</div>
+    <div class="err" id="err"></div>
+  </div>
+  <div id="bannerbox"></div>
+  <div class="card row">
+    <span class="dot" id="wldot"></span><span class="b grow">Белые списки</span><span class="b" id="wl">выкл</span>
+  </div>
+  <div class="card clickable" onclick="show('servers')">
+    <div class="row">
+      <div class="grow"><div class="b ell" id="srvname" style="font-size:17px">Автовыбор сервера</div><div class="m ell" id="srvsub">Подключение к самому быстрому</div></div>
+      <span class="badge" id="srvbadge" style="display:none">Авто</span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <span class="link grow">Все серверы ›</span>
+      <button class="pbtn" id="pingbtn" style="display:none" onclick="event.stopPropagation();api('/api/ping-current').then(poll)">Пинг</button>
+    </div>
+  </div>
+</section>
+
+<!-- servers -->
+<section class="view" id="v-servers">
+  <div class="top"><button class="back" onclick="leaveServers()">←</button><h1>Серверы</h1>
+    <button class="secondary" id="testbtn" onclick="api('/api/ping-all').then(loadServers)">Проверить</button></div>
+  <div class="m" id="srvhint" style="margin-top:10px"></div>
+  <div class="scroll" id="srvlist"></div>
+</section>
+
+<!-- settings -->
+<section class="view" id="v-settings">
+  <div class="top"><button class="back" onclick="show('main')">←</button><h1>Настройки</h1><span class="m" id="ver2"></span></div>
+  <div class="scroll">
+    <div class="section">Подписки</div>
+    <div class="card">
+      <div id="sublist"></div>
+      <input class="field" id="subinput" placeholder="Ещё одна ссылка: https://… или vless://…" style="margin-top:12px">
+      <div class="row" style="margin-top:10px">
+        <button class="secondary grow" onclick="pasteInto('subinput')">Вставить</button>
+        <button class="secondary grow" style="color:var(--accent)" onclick="addSub('subinput')">Добавить</button>
+      </div>
+      <div class="m" id="subinfo" style="margin-top:12px"></div>
+      <button class="secondary" style="width:100%;margin-top:12px" onclick="api('/api/refresh').then(()=>toast('Подписки обновляются'))">Обновить и переподключить</button>
+    </div>
+    <div class="section">Маршрутизация</div>
+    <div class="card">
+      <div class="row"><div class="grow"><div class="b">Российские сайты напрямую</div><div class="m">Без VPN: банки, Госуслуги, маркетплейсы</div></div><div class="switch" id="sw-ru" onclick="setOpt('ruDirect',this)"></div></div>
+      <div class="row" style="margin-top:14px"><div class="grow"><div class="b">Заблокированное в РФ — через VPN</div><div class="m">Даже если сайт в зоне .ru</div></div><div class="switch" id="sw-bl" onclick="setOpt('blockedVpn',this)"></div></div>
+    </div>
+    <div class="section">Журнал</div>
+    <div class="card">
+      <div class="row"><span class="m grow">Последние события</span><button class="secondary" onclick="copyLog()">Скопировать</button></div>
+      <pre class="log" id="log" style="margin-top:10px;max-height:300px;overflow:auto"></pre>
+    </div>
+    <div class="section">О приложении</div>
+    <div class="card"><div class="m">AutoVPN для Windows · ядра sing-box и Xray-core · создано с помощью Claude.<br>Весь трафик ПК идёт через VPN-адаптер, российские сайты — напрямую.</div>
+      <button class="secondary" style="width:100%;margin-top:12px" onclick="api('/api/quit')">Отключить и выйти</button></div>
+  </div>
+</section>
+
+<!-- onboarding -->
+<section class="view" id="v-onb">
+  <div style="margin-top:36px;font-size:28px;font-weight:700">Добавьте подписку</div>
+  <div class="m" style="font-size:15px;margin-top:10px">Вставьте ссылку от VPN-провайдера. Подойдут ссылки на подписку и ключи vless, vmess, trojan, ss, hy2.</div>
+  <div class="b" style="margin-top:26px;font-size:14px">Ссылка</div>
+  <input class="field" id="onbinput" placeholder="https://… или vless://…" style="margin-top:8px;padding:14px">
+  <div class="err" id="onberr" style="text-align:left"></div>
+  <button class="secondary" style="margin-top:12px" onclick="pasteInto('onbinput')">Вставить из буфера</button>
+  <div style="flex:1"></div>
+  <div class="card"><div class="m b">Настроится само</div>
+    <div style="margin-top:10px">✓ Российские сайты — без VPN</div>
+    <div style="margin-top:8px">✓ Самый быстрый сервер — автоматически</div>
+    <div style="margin-top:8px">✓ Если обычные серверы заблокированы — переход на серверы для БС</div></div>
+  <button class="primary" style="margin-top:16px" onclick="addSub('onbinput',true)">Продолжить</button>
+</section>
+
+<div class="menu" id="menu"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const T = location.hash.slice(1);
+let S = {}, view = 'main', offChanged = false, onbForced = false;
+const $ = id => document.getElementById(id);
+async function api(path, body) {
+  const r = await fetch(path, {method: body ? 'POST' : 'GET', headers: {'X-Token': T, 'Content-Type': 'application/json'},
+    body: body ? JSON.stringify(body) : undefined});
+  return r.json();
+}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2200)}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function show(v){
+  view=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
+  if(v==='servers'){offChanged=false;loadServers();if(S.state==='on')api('/api/ping-all')}
+  if(v==='settings')loadSettings();
+}
+function dur(sec){sec=Math.max(0,sec);const p=n=>String(n).padStart(2,'0');return p(Math.floor(sec/3600))+':'+p(Math.floor(sec/60)%60)+':'+p(sec%60)}
+function pc(p){return p<150?'good':p<400?'mid':'bad'}
+
+async function poll(){
+  try{S=await api('/api/state')}catch(e){return}
+  $('ver').textContent='v'+S.version;$('ver2').textContent='версия '+S.version;
+  if(!S.hasSubs && view!=='onb'){show('onb');return}
+  if(S.hasSubs && view==='onb'){show('main')}
+  const st=S.state;
+  $('power').className='power st-'+st;
+  const titles={off:'Отключено',connecting:'Подключение…',on:'Подключено',waiting:'Нет ответа'};
+  $('title').textContent=titles[st];$('title').style.color=st==='waiting'?'var(--warn)':'';
+  const sub=$('subtitle');sub.classList.toggle('mono',st==='on');
+  sub.textContent=st==='on'?dur(Math.floor(Date.now()/1000)-S.since):st==='off'?'Нажмите, чтобы включить':S.phase;
+  $('err').textContent=st==='off'?S.error:'';
+  $('bannerbox').innerHTML=S.banner?`<div class="banner ${S.bannerTone===1?'ok':''}">${esc(S.banner)}</div>`:'';
+  // white lists: on a PC only the "regular servers blocked" case matters
+  const blk=S.regularBlocked&&st!=='off';
+  $('wl').textContent=blk?'выкл · блокировка':'выкл';
+  $('wl').style.color=blk?'var(--warn)':'var(--accent)';$('wldot').style.background=blk?'var(--warn)':'var(--accent)';
+  const manual=!!S.pinned;
+  if(st==='on'&&S.server){
+    $('srvname').textContent=S.server;
+    $('srvsub').textContent=(manual?'Выбран вручную':'Лучший из '+S.alive)+' · '+(S.ping>0?S.ping+' мс':'пинг —')+' · '+(S.group==='auto-lte'?'LTE':'обычные');
+    const b=$('srvbadge');b.style.display='';b.textContent=S.switching?'Проверка…':manual?'Вручную':'Авто';b.className='badge '+(S.switching?'':manual?'warn':'ok');
+  }else{
+    $('srvbadge').style.display='none';
+    $('srvname').textContent=st==='connecting'?'Выбор сервера…':st==='waiting'?'Сервер не выбран':'Автовыбор сервера';
+    $('srvsub').textContent=st==='connecting'?(S.summary||''):st==='waiting'?'Выбор сервера после появления связи':'Подключение к самому быстрому';
+  }
+  const pb=$('pingbtn');pb.style.display=st==='on'?'':'none';
+  pb.textContent=S.pingingCurrent?'…':S.ping>0?S.ping+' мс':'Пинг';
+  pb.className='pbtn '+(!S.pingingCurrent&&S.ping>0?pc(S.ping):'');
+  if(view==='servers')loadServers();
+}
+
+async function loadServers(){
+  const r=await api('/api/servers');const list=r.servers||[];const pinned=r.pinned||'';
+  const subs=new Set(list.map(s=>s.sub));const many=subs.size>1;
+  const on=S.state==='on';
+  $('testbtn').textContent=S.pinging?'Проверка…':'Проверить';$('testbtn').style.opacity=on&&!S.pinging?1:.5;
+  const offN=list.filter(s=>s.off).length;
+  $('srvhint').textContent=(on?'Клик — использовать сервер. «Авто» выбирает лучший сам.':'Подключитесь, чтобы увидеть пинг. Выбор применится при подключении.')+' Правый клик — отключить или включить сервер.'+(offN?' Отключено: '+offN:'');
+  let h=`<div class="item" onclick="pin('')"><div class="grow"><div class="b">Авто</div><div class="m">Лучший сервер выбирается сам</div></div><span class="pv good">${pinned?'':'✓'}</span></div>`;
+  for(const s of list){
+    const sub=(s.group==='lte'?'LTE / белые списки':'обычный')+(s.xhttp?' · xhttp':'')+(many&&s.sub?' · '+esc(s.sub):'');
+    let right='';
+    if(s.off)right='<span class="pv" style="color:var(--muted)">отключён</span>';
+    else if(pinned===s.name)right=`<span class="pv good">${s.ping>0?s.ping+' мс  ':''}✓</span>`;
+    else if(s.ping>0)right=`<span class="pv ${pc(s.ping)}">${s.ping} мс</span>`;
+    else if(s.ping<0)right='<span class="pv bad">—</span>';
+    h+=`<div class="item ${s.off?'off':''}" data-name="${esc(s.name)}" data-off="${s.off}"><div class="grow"><div class="b ell">${esc(s.name)}</div><div class="m ell">${sub}</div></div>${right}</div>`;
+  }
+  const box=$('srvlist');const top=box.scrollTop;box.innerHTML=h;box.scrollTop=top;
+  box.querySelectorAll('.item[data-name]').forEach(el=>{
+    const name=el.dataset.name,off=el.dataset.off==='true';
+    el.onclick=()=>off?toast('Сервер отключён. Правый клик — включить'):pin(name);
+    el.oncontextmenu=e=>{e.preventDefault();openMenu(e.clientX,e.clientY,off?'Включить сервер':'Отключить сервер',async()=>{
+      await api('/api/off',{name,off:!off});offChanged=true;loadServers();})};
+  });
+}
+async function pin(name){await api('/api/pin',{name});toast(name?'Выбран: '+name:'Автовыбор');setTimeout(poll,600);loadServers()}
+function leaveServers(){show('main');if(offChanged&&S.state!=='off'){api('/api/apply');toast('Переподключение для применения')}offChanged=false}
+function openMenu(x,y,label,fn){const m=$('menu');m.innerHTML=`<button>${label}</button>`;m.firstChild.onclick=()=>{m.style.display='none';fn()};
+  m.style.display='block';m.style.left=Math.min(x,innerWidth-200)+'px';m.style.top=Math.min(y,innerHeight-60)+'px'}
+document.addEventListener('click',()=>$('menu').style.display='none');
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('.item'))e.preventDefault()});
+
+async function loadSettings(){
+  const r=await api('/api/subs');
+  $('sublist').innerHTML=(r.subs||[]).map((s,i)=>`${i?'<div style="height:1px;background:var(--line);margin:12px 0"></div>':''}
+    <div class="row"><div class="grow"><div class="b ell">${esc(s.name)}</div><div class="m ell" style="font-family:Consolas,monospace;font-size:12px">${esc(s.url)}</div></div>
+    <button class="x" title="Удалить" data-url="${esc(s.url)}">✕</button></div>`).join('');
+  $('sublist').querySelectorAll('.x').forEach(b=>b.onclick=async()=>{
+    if((r.subs||[]).length<=1){toast('Должна остаться хотя бы одна подписка');return}
+    if(!confirmBox('Удалить подписку?'))return;
+    await api('/api/subs/remove',{url:b.dataset.url});loadSettings()});
+  const upd=r.updated?new Date(r.updated*1000):null;
+  $('subinfo').textContent=(upd?'Загружены '+upd.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Ещё не загружались')
+    +(r.summary?'\n'+r.summary:'')+'\nСерверы всех подписок объединяются. Пока VPN включён, подписки обновляются сами раз в 12 часов.';
+  $('subinfo').style.whiteSpace='pre-line';
+  $('sw-ru').classList.toggle('on',!!r.ruDirect);$('sw-bl').classList.toggle('on',!!r.blockedVpn);
+  const lg=await api('/api/log');$('log').textContent=lg.text||'Пока пусто';
+}
+let confirmed=null;
+function confirmBox(q){return window.confirm(q)}
+async function setOpt(key,el){const v=!el.classList.contains('on');el.classList.toggle('on',v);await api('/api/settings',{[key]:v});if(S.state!=='off')toast('Переподключение для применения')}
+async function addSub(id,onb){
+  const v=$(id).value.trim();
+  const r=await api('/api/subs/add',{url:v});
+  if(!r.ok){if(onb)$('onberr').textContent=r.error;else toast(r.error);return}
+  $(id).value='';
+  if(onb){show('main')}else{toast(S.state!=='off'?'Добавлено, переподключение':'Добавлено');loadSettings()}
+}
+async function pasteInto(id){try{$(id).value=(await navigator.clipboard.readText()).trim()}catch(e){toast('Нажмите Ctrl+V в поле');$(id).focus()}}
+async function copyLog(){try{await navigator.clipboard.writeText($('log').textContent);toast('Журнал скопирован')}catch(e){toast('Не удалось скопировать')}}
+
+show('main');poll();setInterval(poll,1000);
+setInterval(()=>{if(view==='settings')api('/api/log').then(r=>$('log').textContent=r.text||'Пока пусто')},3000);
+</script>
+</body>
+</html>
