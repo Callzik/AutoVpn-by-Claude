@@ -59,14 +59,7 @@ func deviceModel() string {
 
 func dataRoot() string {
 	if d := os.Getenv("LOCALAPPDATA"); d != "" {
-		dir := d + `\Dash`
-		// settings of the AutoVPN-named versions move over once
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			if _, err := os.Stat(d + `\AutoVPN`); err == nil {
-				_ = os.Rename(d+`\AutoVPN`, dir)
-			}
-		}
-		return dir
+		return d + `\Dash`
 	}
 	return `C:\Dash`
 }

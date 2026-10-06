@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds AutoVPN APK without Gradle: aapt2 + javac + dx + apksigner.
+# Builds the Dash APK without Gradle: aapt2 + javac + dx + apksigner.
 set -euo pipefail
 export JAVA_TOOL_OPTIONS=
 cd "$(dirname "$0")"
@@ -12,7 +12,7 @@ echo "== resources"
 $T/aapt2 compile --dir res -o $B/res.zip
 $T/aapt2 link -o $B/base.apk -I $ANDROID_JAR --manifest AndroidManifest.xml \
   --java $B/gen -A assets --min-sdk-version 26 --target-sdk-version 33 \
-  --version-code 18 --version-name 1.7 $B/res.zip
+  --version-code 19 --version-name 1.8 $B/res.zip
 
 echo "== java"
 javac -nowarn -encoding UTF-8 --release 8 -Xlint:-options -classpath $ANDROID_JAR -d $B/classes \
@@ -50,13 +50,12 @@ out.close()
 EOF
 
 echo "== sign"
-KS=/home/claude/vpn/autovpn.keystore
-if [ ! -f $KS ]; then
-  keytool -genkeypair -keystore $KS -storepass autovpn123 -keypass autovpn123 -alias autovpn \
-    -keyalg RSA -keysize 3072 -validity 10000 -dname "CN=AutoVPN" >/dev/null 2>&1
-fi
-java -jar $T/apksigner.jar sign --ks $KS --ks-pass pass:autovpn123 --ks-key-alias autovpn \
+# signing key: path, alias and password come from the environment (or a local keystore.env), never from the repo
+[ -f ../keystore.env ] && { set -a; . ../keystore.env; set +a; }
+: "${DASH_KS:?set DASH_KS (keystore path)}" "${DASH_KS_PASS:?set DASH_KS_PASS}"
+DASH_KS_ALIAS=${DASH_KS_ALIAS:-dash}
+java -jar $T/apksigner.jar sign --ks "$DASH_KS" --ks-pass env:DASH_KS_PASS --ks-key-alias "$DASH_KS_ALIAS" \
   --min-sdk-version 26 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
-  --out $B/AutoVPN.apk $B/unsigned.apk
-java -jar $T/apksigner.jar verify -v $B/AutoVPN.apk | head -6
-ls -la $B/AutoVPN.apk
+  --out $B/Dash.apk $B/unsigned.apk
+java -jar $T/apksigner.jar verify -v $B/Dash.apk | head -6
+ls -la $B/Dash.apk

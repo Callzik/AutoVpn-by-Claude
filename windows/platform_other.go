@@ -17,10 +17,10 @@ const (
 func bypassProcs() []string { return nil }
 
 func init() {
-	if u := os.Getenv("AUTOVPN_TEST_URL"); u != "" {
+	if u := os.Getenv("DASH_TEST_URL"); u != "" {
 		TestURL = u
 	}
-	if p := os.Getenv("AUTOVPN_TEST_MIXED"); p != "" {
+	if p := os.Getenv("DASH_TEST_MIXED"); p != "" {
 		testMixedPort, _ = strconv.Atoi(p)
 	}
 }
@@ -42,8 +42,8 @@ func deviceModel() string {
 	return h
 }
 func dataRoot() string {
-	if d := os.Getenv("AUTOVPN_DIR"); d != "" {
+	if d := os.Getenv("DASH_DIR"); d != "" {
 		return d
 	}
-	return filepath.Join(os.TempDir(), "autovpn-test")
+	return filepath.Join(os.TempDir(), "dash-test")
 }

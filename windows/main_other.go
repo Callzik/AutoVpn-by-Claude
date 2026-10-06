@@ -8,9 +8,9 @@ import (
 	"os/signal"
 )
 
-// Test build for Linux: serves the UI and runs the cores from AUTOVPN_BIN.
+// Test build for Linux: serves the UI and runs the cores from DASH_BIN.
 func main() {
-	bin := os.Getenv("AUTOVPN_BIN")
+	bin := os.Getenv("DASH_BIN")
 	app, err := NewApp(bin)
 	if err != nil {
 		fmt.Println(err)

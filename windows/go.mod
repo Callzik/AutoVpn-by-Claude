@@ -1,4 +1,4 @@
-module autovpn
+module dash
 
 go 1.24
 
