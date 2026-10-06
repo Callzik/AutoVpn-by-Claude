@@ -28,6 +28,8 @@ type PrefsData struct {
 	BlockedVPN bool              `json:"blocked_vpn"`
 	SubUpdated int64             `json:"sub_updated"`
 	HWID       string            `json:"hwid"`
+	TunAddr    int               `json:"tun_addr"`
+	AutoStart  bool              `json:"connect_on_start"`
 }
 
 func LoadPrefs(dir string) *Prefs {

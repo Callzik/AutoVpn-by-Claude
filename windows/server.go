@@ -71,7 +71,7 @@ func (a *API) handler() http.Handler {
 		for _, u := range d.Subs {
 			list = append(list, map[string]string{"url": u, "name": a.prefs.SubLabel(u)})
 		}
-		writeJSON(w, map[string]any{"subs": list, "updated": d.SubUpdated, "ruDirect": d.RuDirect, "blockedVpn": d.BlockedVPN,
+		writeJSON(w, map[string]any{"subs": list, "updated": d.SubUpdated, "ruDirect": d.RuDirect, "blockedVpn": d.BlockedVPN, "autoStart": d.AutoStart,
 			"summary": a.core.View().Summary})
 	})
 	api("/api/subs/add", func(w http.ResponseWriter, r *http.Request) {
@@ -101,8 +101,13 @@ func (a *API) handler() http.Handler {
 			if v, ok := b["blockedVpn"].(bool); ok {
 				d.BlockedVPN = v
 			}
+			if v, ok := b["autoStart"].(bool); ok {
+				d.AutoStart = v
+			}
 		})
-		a.core.Restart()
+		if _, only := b["autoStart"]; !only || len(b) > 1 {
+			a.core.Restart()
+		}
 		writeJSON(w, true)
 	})
 	api("/api/refresh", func(w http.ResponseWriter, r *http.Request) {

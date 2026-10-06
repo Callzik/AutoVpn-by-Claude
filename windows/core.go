@@ -70,6 +70,7 @@ type Core struct {
 	bannerAt           time.Time
 	lastServers        string
 	pendingRetry       *time.Timer
+	crashes            []time.Time
 }
 
 func NewCore(prefs *Prefs, dataDir, binDir, ruleDir string, log *Log) *Core {
@@ -119,9 +120,9 @@ func (c *Core) showBanner(text string, tone int) {
 
 func (c *Core) groupLabel(g string) string {
 	if g == GroupNameLTE {
-		return "серверы для БС (LTE)"
+		return "резервные серверы"
 	}
-	return "обычные серверы"
+	return "основные серверы"
 }
 
 /* ---------- connect / disconnect ---------- */
@@ -380,7 +381,7 @@ func (c *Core) applyServers(list []*Server, warnings []string) {
 	for _, s := range list {
 		subs[s.Sub] = true
 	}
-	summary := fmt.Sprintf("Серверов: %d · обычных %d, LTE %d, не участвуют %d", len(list), reg, lte, ex)
+	summary := fmt.Sprintf("Серверов: %d · основных %d, резервных %d, не участвуют %d", len(list), reg, lte, ex)
 	if len(subs) > 1 {
 		summary += fmt.Sprintf(" · подписок %d", len(subs))
 	}
@@ -460,54 +461,49 @@ func (c *Core) startCore(g int) error {
 		c.log.Add(fmt.Sprintf("xhttp-серверов: %d, они идут через ядро Xray", len(xs)))
 	}
 
-	port, secret := freePort(), randHex(16)
-	cfg, err := BuildSingBox(servers, BuildOptions{
-		RuDirect: c.prefs.Get().RuDirect, BlockedVPN: c.prefs.Get().BlockedVPN,
-		RuleDir: c.ruleDir, Secret: secret, ClashPort: port, InitialGroup: group,
-		TunName: "AutoVPN", BypassProcs: bypassProcs()})
-	if err != nil {
-		return err
-	}
-	cfgPath := filepath.Join(c.dataDir, "config.json")
-	if err := os.WriteFile(cfgPath, []byte(cfg), 0600); err != nil {
-		return err
-	}
-	clash := NewClash(port, secret)
 	if !c.current(g) {
 		return nil
 	}
 	if xrayCfg != "" {
 		xp := filepath.Join(c.dataDir, "xray.json")
 		_ = os.WriteFile(xp, []byte(xrayCfg), 0600)
-		cmd, err := c.startProc(g, "Xray", filepath.Join(c.binDir, xrayExe), []string{"run", "-c", xp}, false)
+		xp2, err := c.startProc(g, "Xray", filepath.Join(c.binDir, xrayExe), []string{"run", "-c", xp}, false)
 		if err != nil {
 			c.log.Add("Не удалось запустить Xray: " + err.Error() + " — xhttp-серверы недоступны")
 		} else {
+			xp2.mu.Lock()
+			xp2.starting = false
+			xp2.mu.Unlock()
 			c.mu.Lock()
-			c.xrProc = cmd
+			c.xrProc = xp2.cmd
 			c.mu.Unlock()
 		}
 	}
 	c.setPhase(g, "Запуск ядра")
-	cmd, err := c.startProc(g, "", filepath.Join(c.binDir, singBoxExe), []string{"run", "-c", cfgPath, "-D", c.dataDir, "--disable-color"}, true)
-	if err != nil {
-		return fmt.Errorf("ядро не запустилось: %v", err)
-	}
-	c.mu.Lock()
-	c.sbProc, c.clash = cmd, clash
-	c.mu.Unlock()
-	deadline := time.Now().Add(25 * time.Second)
-	for !clash.Alive() {
+	// the TUN address may be taken by another VPN adapter: try the next one
+	first := c.prefs.Get().TunAddr
+	var lastErr error
+	for i := 0; i < len(tunAddrs); i++ {
+		idx := (first + i) % len(tunAddrs)
+		ok, retry, err := c.startSingBox(g, servers, group, idx)
 		if !c.current(g) {
 			return nil
 		}
-		if cmd.ProcessState != nil {
-			return fmt.Errorf("ядро завершилось при запуске, подробности в журнале")
+		if ok {
+			if idx != first {
+				c.prefs.Update(func(d *PrefsData) { d.TunAddr = idx })
+			}
+			lastErr = nil
+			break
 		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("ядро не отвечает")
+		lastErr = err
+		if !retry {
+			return err
 		}
-		time.Sleep(300 * time.Millisecond)
+		c.log.Add("Адрес " + tunAddrs[idx][0] + " занят другим адаптером, пробуется следующий")
+	}
+	if lastErr != nil {
+		return lastErr
 	}
 	c.setPhase(g, "Поиск самого быстрого сервера ("+c.groupLabel(group)+")")
 	working := c.ensureWorkingGroup(g, group, true)
@@ -524,13 +520,91 @@ func (c *Core) startCore(g int) error {
 	return nil
 }
 
+// proc is a running core; done is closed when it exits.
+type proc struct {
+	cmd      *exec.Cmd
+	done     chan struct{}
+	mu       sync.Mutex
+	fatal    string
+	starting bool
+}
+
+func (p *proc) lastFatal() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.fatal
+}
+
+func (p *proc) exited() bool {
+	select {
+	case <-p.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// TUN addresses to try: another VPN client's adapter may already hold one of them.
+var tunAddrs = [][2]string{
+	{"10.255.250.1/30", "fd7a:7576:706e::1/126"},
+	{"100.127.250.1/30", "fd7a:7576:706f::1/126"},
+	{"172.31.250.1/30", "fd7a:7576:7070::1/126"},
+	{"192.168.250.1/30", "fd7a:7576:7071::1/126"},
+}
+
+// startSingBox writes the config with TUN address #idx and starts the core.
+// retry=true when the failure is an address conflict worth another address.
+func (c *Core) startSingBox(g int, servers []*Server, group string, idx int) (ok, retry bool, err error) {
+	port, secret := freePort(), randHex(16)
+	cfg, err := BuildSingBox(servers, BuildOptions{
+		RuDirect: c.prefs.Get().RuDirect, BlockedVPN: c.prefs.Get().BlockedVPN,
+		RuleDir: c.ruleDir, Secret: secret, ClashPort: port, InitialGroup: group,
+		TunName: "AutoVPN", TunAddr4: tunAddrs[idx][0], TunAddr6: tunAddrs[idx][1], BypassProcs: bypassProcs()})
+	if err != nil {
+		return false, false, err
+	}
+	cfgPath := filepath.Join(c.dataDir, "config.json")
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0600); err != nil {
+		return false, false, err
+	}
+	p, err := c.startProc(g, "", filepath.Join(c.binDir, singBoxExe), []string{"run", "-c", cfgPath, "-D", c.dataDir, "--disable-color"}, true)
+	if err != nil {
+		return false, false, fmt.Errorf("ядро не запустилось: %v", err)
+	}
+	clash := NewClash(port, secret)
+	c.mu.Lock()
+	c.sbProc, c.clash = p.cmd, clash
+	c.mu.Unlock()
+	deadline := time.Now().Add(25 * time.Second)
+	for !clash.Alive() {
+		if !c.current(g) {
+			return false, false, nil
+		}
+		if p.exited() {
+			f := strings.ToLower(p.lastFatal())
+			conflict := strings.Contains(f, "already exists") || strings.Contains(f, "address") && strings.Contains(f, "tun")
+			return false, conflict, fmt.Errorf("ядро завершилось при запуске, подробности в журнале")
+		}
+		if time.Now().After(deadline) {
+			killProc(p.cmd)
+			return false, false, fmt.Errorf("ядро не отвечает")
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	p.mu.Lock()
+	p.starting = false
+	p.mu.Unlock()
+	return true, false, nil
+}
+
 var (
 	reAnsi  = regexp.MustCompile("\x1b\\[[;\\d]*m")
 	reStamp = regexp.MustCompile(`^([+-]\d{4} )?\d{4}[-/]\d\d[-/]\d\d \d\d:\d\d:\d\d(\.\d+)? `)
 )
 
-func (c *Core) startProc(g int, prefix, bin string, args []string, critical bool) (*exec.Cmd, error) {
+func (c *Core) startProc(g int, prefix, bin string, args []string, critical bool) (*proc, error) {
 	cmd := exec.Command(bin, args...)
+	p := &proc{cmd: cmd, done: make(chan struct{}), starting: true}
 	cmd.Dir = c.dataDir
 	cmd.Env = append(os.Environ(), "XRAY_LOCATION_ASSET="+c.dataDir)
 	hideWindow(cmd)
@@ -550,6 +624,11 @@ func (c *Core) startProc(g int, prefix, bin string, args []string, critical bool
 				strings.Contains(line, "Penetrates Everything") || strings.Contains(line, "platform for anti-censorship") {
 				continue
 			}
+			if strings.Contains(line, "FATAL") || strings.Contains(line, "Failed to start") {
+				p.mu.Lock()
+				p.fatal = line
+				p.mu.Unlock()
+			}
 			if prefix != "" {
 				line = prefix + ": " + line
 			}
@@ -559,8 +638,12 @@ func (c *Core) startProc(g int, prefix, bin string, args []string, critical bool
 	go func() {
 		_ = cmd.Wait()
 		pw.Close()
-		if !c.current(g) {
-			return
+		close(p.done)
+		p.mu.Lock()
+		starting := p.starting
+		p.mu.Unlock()
+		if starting || !c.current(g) {
+			return // startCore deals with failures while starting
 		}
 		c.mu.Lock()
 		mine := c.sbProc == cmd || c.xrProc == cmd
@@ -569,13 +652,35 @@ func (c *Core) startProc(g int, prefix, bin string, args []string, critical bool
 			return
 		}
 		if critical {
-			c.log.Add("Ядро остановилось")
-			c.fail(g, "Ядро остановилось, подробности в журнале")
+			c.coreCrashed(g)
 		} else {
 			c.log.Add("Ядро Xray остановилось — xhttp-серверы недоступны, остальные работают")
 		}
 	}()
-	return cmd, nil
+	return p, nil
+}
+
+// coreCrashed restarts the core by itself; gives up after 3 crashes in 10 minutes.
+func (c *Core) coreCrashed(g int) {
+	c.mu.Lock()
+	now := time.Now()
+	var recent []time.Time
+	for _, t := range c.crashes {
+		if now.Sub(t) < 10*time.Minute {
+			recent = append(recent, t)
+		}
+	}
+	recent = append(recent, now)
+	c.crashes = recent
+	n := len(recent)
+	c.mu.Unlock()
+	if n > 3 {
+		c.log.Add("Ядро остановилось несколько раз подряд")
+		c.fail(g, "Ядро останавливается снова и снова, подробности в журнале")
+		return
+	}
+	c.log.Add("Ядро остановилось — перезапуск")
+	c.Restart()
 }
 
 /* ---------- group logic ---------- */
@@ -628,7 +733,7 @@ func (c *Core) ensureWorkingGroup(g int, group string, initial bool) string {
 	}
 	blocked := use == GroupNameLTE && group == GroupNameRegular
 	if blocked {
-		c.log.Add("Обычные серверы не отвечают — используются серверы для БС")
+		c.log.Add("Основные серверы не отвечают — используются резервные")
 	}
 	_ = cl.Select(Selector, use)
 	c.mu.Lock()
@@ -703,7 +808,7 @@ func (c *Core) reevaluate(g int, cause string) {
 		used = c.ensureWorkingGroup(g, want, false)
 	} else {
 		cur := cl.Now(active)
-		if d := cl.LastDelay(cur); d > 0 && cur != "" {
+		if d := cl.LastDelay(cur); d > 0 && cur != "" && cause != "resume" {
 			used = active
 		} else if res := cl.TestGroup(active, 5000); len(res) > 0 {
 			used = active
@@ -799,11 +904,21 @@ func (c *Core) loops(g int) {
 	defer watch.Stop()
 	defer periodic.Stop()
 	defer subs.Stop()
+	last := time.Now()
 	for {
 		select {
 		case <-stop:
 			return
 		case <-status.C:
+			// a long gap between ticks means the PC was asleep: old connections are dead
+			if time.Since(last) > 30*time.Second {
+				c.log.Add("Выход из сна — проверка соединения")
+				if cl := c.cl(); cl != nil {
+					cl.CloseAll()
+				}
+				go c.reevaluate(g, "resume")
+			}
+			last = time.Now()
 			c.refreshStatus()
 		case <-watch.C:
 			c.watch(g)

@@ -23,6 +23,6 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 
 ## Windows
 
-Готовая сборка: [`apk/AutoVPN-Windows-1.0.zip`](apk/AutoVPN-Windows-1.0.zip) — распакуйте и запустите `AutoVPN.exe` (нужны права администратора для VPN-адаптера, Windows 10/11 x64).
+Готовая сборка: [`apk/AutoVPN-Windows-1.1.zip`](apk/AutoVPN-Windows-1.1.zip) — распакуйте и запустите `AutoVPN.exe` (нужны права администратора для VPN-адаптера, Windows 10/11 x64).
 То же, что на телефоне: одна кнопка, автовыбор сервера, несколько подписок, список серверов с пингом, ручной выбор и отключение серверов, xhttp через Xray, российские сайты напрямую. Весь трафик ПК идёт через TUN-адаптер.
 Исходники — в папке [`windows/`](windows/) (Go + WebView2, ядра sing-box и Xray-core — официальные сборки).

@@ -115,9 +115,6 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
     <div class="err" id="err"></div>
   </div>
   <div id="bannerbox"></div>
-  <div class="card row">
-    <span class="dot" id="wldot"></span><span class="b grow">Белые списки</span><span class="b" id="wl">выкл</span>
-  </div>
   <div class="card clickable" onclick="show('servers')">
     <div class="row">
       <div class="grow"><div class="b ell" id="srvname" style="font-size:17px">Автовыбор сервера</div><div class="m ell" id="srvsub">Подключение к самому быстрому</div></div>
@@ -158,13 +155,17 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
       <div class="row"><div class="grow"><div class="b">Российские сайты напрямую</div><div class="m">Без VPN: банки, Госуслуги, маркетплейсы</div></div><div class="switch" id="sw-ru" onclick="setOpt('ruDirect',this)"></div></div>
       <div class="row" style="margin-top:14px"><div class="grow"><div class="b">Заблокированное в РФ — через VPN</div><div class="m">Даже если сайт в зоне .ru</div></div><div class="switch" id="sw-bl" onclick="setOpt('blockedVpn',this)"></div></div>
     </div>
+    <div class="section">Запуск</div>
+    <div class="card">
+      <div class="row"><div class="grow"><div class="b">Подключаться при запуске</div><div class="m">Сразу включать VPN, когда открывается AutoVPN</div></div><div class="switch" id="sw-as" onclick="setAuto(this)"></div></div>
+    </div>
     <div class="section">Журнал</div>
     <div class="card">
       <div class="row"><span class="m grow">Последние события</span><button class="secondary" onclick="copyLog()">Скопировать</button></div>
       <pre class="log" id="log" style="margin-top:10px;max-height:300px;overflow:auto"></pre>
     </div>
     <div class="section">О приложении</div>
-    <div class="card"><div class="m">AutoVPN для Windows · ядра sing-box и Xray-core · создано с помощью Claude.<br>Весь трафик ПК идёт через VPN-адаптер, российские сайты — напрямую.</div>
+    <div class="card"><div class="m">AutoVPN для Windows · ядра sing-box и Xray-core · создано с помощью Claude.<br>Весь трафик ПК идёт через VPN-адаптер, российские сайты — напрямую. Упавшее ядро перезапускается само, после сна соединение проверяется заново.</div>
       <button class="secondary" style="width:100%;margin-top:12px" onclick="api('/api/quit')">Отключить и выйти</button></div>
   </div>
 </section>
@@ -181,7 +182,7 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
   <div class="card"><div class="m b">Настроится само</div>
     <div style="margin-top:10px">✓ Российские сайты — без VPN</div>
     <div style="margin-top:8px">✓ Самый быстрый сервер — автоматически</div>
-    <div style="margin-top:8px">✓ Если обычные серверы заблокированы — переход на серверы для БС</div></div>
+    <div style="margin-top:8px">✓ Сервер перестал отвечать — переключение на другой</div></div>
   <button class="primary" style="margin-top:16px" onclick="addSub('onbinput',true)">Продолжить</button>
 </section>
 
@@ -220,14 +221,10 @@ async function poll(){
   sub.textContent=st==='on'?dur(Math.floor(Date.now()/1000)-S.since):st==='off'?'Нажмите, чтобы включить':S.phase;
   $('err').textContent=st==='off'?S.error:'';
   $('bannerbox').innerHTML=S.banner?`<div class="banner ${S.bannerTone===1?'ok':''}">${esc(S.banner)}</div>`:'';
-  // white lists: on a PC only the "regular servers blocked" case matters
-  const blk=S.regularBlocked&&st!=='off';
-  $('wl').textContent=blk?'выкл · блокировка':'выкл';
-  $('wl').style.color=blk?'var(--warn)':'var(--accent)';$('wldot').style.background=blk?'var(--warn)':'var(--accent)';
   const manual=!!S.pinned;
   if(st==='on'&&S.server){
     $('srvname').textContent=S.server;
-    $('srvsub').textContent=(manual?'Выбран вручную':'Лучший из '+S.alive)+' · '+(S.ping>0?S.ping+' мс':'пинг —')+' · '+(S.group==='auto-lte'?'LTE':'обычные');
+    $('srvsub').textContent=(manual?'Выбран вручную':'Лучший из '+S.alive)+' · '+(S.ping>0?S.ping+' мс':'пинг —')+' · '+(S.group==='auto-lte'?'резервные':'основные');
     const b=$('srvbadge');b.style.display='';b.textContent=S.switching?'Проверка…':manual?'Вручную':'Авто';b.className='badge '+(S.switching?'':manual?'warn':'ok');
   }else{
     $('srvbadge').style.display='none';
@@ -249,7 +246,7 @@ async function loadServers(){
   $('srvhint').textContent=(on?'Клик — использовать сервер. «Авто» выбирает лучший сам.':'Подключитесь, чтобы увидеть пинг. Выбор применится при подключении.')+' Правый клик — отключить или включить сервер.'+(offN?' Отключено: '+offN:'');
   let h=`<div class="item" onclick="pin('')"><div class="grow"><div class="b">Авто</div><div class="m">Лучший сервер выбирается сам</div></div><span class="pv good">${pinned?'':'✓'}</span></div>`;
   for(const s of list){
-    const sub=(s.group==='lte'?'LTE / белые списки':'обычный')+(s.xhttp?' · xhttp':'')+(many&&s.sub?' · '+esc(s.sub):'');
+    const sub=(s.group==='lte'?'резервный':'основной')+(s.xhttp?' · xhttp':'')+(many&&s.sub?' · '+esc(s.sub):'');
     let right='';
     if(s.off)right='<span class="pv" style="color:var(--muted)">отключён</span>';
     else if(pinned===s.name)right=`<span class="pv good">${s.ping>0?s.ping+' мс  ':''}✓</span>`;
@@ -285,12 +282,13 @@ async function loadSettings(){
   $('subinfo').textContent=(upd?'Загружены '+upd.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Ещё не загружались')
     +(r.summary?'\n'+r.summary:'')+'\nСерверы всех подписок объединяются. Пока VPN включён, подписки обновляются сами раз в 12 часов.';
   $('subinfo').style.whiteSpace='pre-line';
-  $('sw-ru').classList.toggle('on',!!r.ruDirect);$('sw-bl').classList.toggle('on',!!r.blockedVpn);
+  $('sw-ru').classList.toggle('on',!!r.ruDirect);$('sw-bl').classList.toggle('on',!!r.blockedVpn);$('sw-as').classList.toggle('on',!!r.autoStart);
   const lg=await api('/api/log');$('log').textContent=lg.text||'Пока пусто';
 }
 let confirmed=null;
 function confirmBox(q){return window.confirm(q)}
 async function setOpt(key,el){const v=!el.classList.contains('on');el.classList.toggle('on',v);await api('/api/settings',{[key]:v});if(S.state!=='off')toast('Переподключение для применения')}
+async function setAuto(el){const v=!el.classList.contains('on');el.classList.toggle('on',v);await api('/api/settings',{autoStart:v})}
 async function addSub(id,onb){
   const v=$(id).value.trim();
   const r=await api('/api/subs/add',{url:v});

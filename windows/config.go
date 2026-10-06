@@ -26,6 +26,8 @@ type BuildOptions struct {
 	ClashPort    int
 	InitialGroup string
 	TunName      string
+	TunAddr4     string
+	TunAddr6     string
 	// processes that must bypass the tunnel (our app and the bundled Xray)
 	BypassProcs []string
 }
@@ -130,7 +132,7 @@ func BuildSingBox(servers []*Server, opt BuildOptions) (string, error) {
 		"default_domain_resolver": "dns-direct",
 	}
 	tun := obj{"type": "tun", "tag": "tun-in",
-		"address":      arr("172.19.0.1/30", "fdfe:dcba:9876::1/126"),
+		"address":      arr(opt.TunAddr4, opt.TunAddr6),
 		"mtu":          9000,
 		"auto_route":   true,
 		"strict_route": true,
