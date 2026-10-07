@@ -1,10 +1,12 @@
 #!/bin/bash
 # Builds the Dash APK without Gradle: aapt2 + javac + dx + apksigner.
+# Tools: TOOLS (aapt2, dx.jar, apksigner.jar), ANDROID_JAR. Cores: CORES_DIR (scripts/fetch-cores.sh android).
 set -euo pipefail
 export JAVA_TOOL_OPTIONS=
 cd "$(dirname "$0")"
-T=/home/claude/vpn/tools
-ANDROID_JAR=$T/platforms/android-34/android.jar
+T=${TOOLS:-/home/claude/vpn/tools}
+ANDROID_JAR=${ANDROID_JAR:-$T/platforms/android-34/android.jar}
+CORES=${CORES_DIR:-/home/claude/vpn/out}
 B=build
 rm -rf $B && mkdir -p $B/gen $B/classes $B/apk
 
@@ -22,8 +24,9 @@ echo "== dex"
 java -jar $T/dx.jar --dex --min-sdk-version=26 --output=$B/classes.dex $B/classes
 
 echo "== package"
-python3 - <<'EOF'
-import zipfile
+CORES="$CORES" python3 - <<'EOF'
+import os, zipfile
+cores = os.environ["CORES"]
 src = zipfile.ZipFile("build/base.apk")
 out = zipfile.ZipFile("build/unsigned.apk", "w")
 for info in src.infolist():
@@ -44,8 +47,8 @@ def add(name, path, ctype=zipfile.ZIP_DEFLATED):
     with open(path, "rb") as f:
         out.writestr(zi, f.read(), compresslevel=9)
 add("classes.dex", "build/classes.dex")
-add("lib/arm64-v8a/libsbhelper.so", "/home/claude/vpn/out/sbhelper-android-arm64")
-add("lib/arm64-v8a/libxray.so", "/home/claude/vpn/out/xray-android-arm64")
+add("lib/arm64-v8a/libsbhelper.so", cores + "/sbhelper-android-arm64")
+add("lib/arm64-v8a/libxray.so", cores + "/xray-android-arm64")
 out.close()
 EOF
 

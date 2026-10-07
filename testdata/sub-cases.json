@@ -1,0 +1,508 @@
+[
+ {
+  "name": "vless reality tcp, emoji cleanup",
+  "sub": "vless://11111111-2222-3333-4444-555555555555@de.example.com:443?security=reality\u0026sni=www.google.com\u0026fp=chrome\u0026pbk=PUBKEY\u0026sid=0123\u0026flow=xtls-rprx-vision\u0026type=tcp#%F0%9F%87%A9%F0%9F%87%AA%20Germany%20%F0%9F%94%A5%20%7C%20Fast",
+  "servers": [
+   {
+    "name": "🇩🇪 Germany | Fast",
+    "group": 0,
+    "host": "de.example.com",
+    "outbound": {
+     "flow": "xtls-rprx-vision",
+     "packet_encoding": "xudp",
+     "server": "de.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "enabled": true,
+      "reality": {
+       "enabled": true,
+       "public_key": "PUBKEY",
+       "short_id": "0123"
+      },
+      "server_name": "www.google.com",
+      "utls": {
+       "enabled": true,
+       "fingerprint": "chrome"
+      }
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "vless ws tls early data",
+  "sub": "vless://11111111-2222-3333-4444-555555555555@ws.example.com:443?security=tls\u0026type=ws\u0026host=cdn.example.com\u0026path=%2Fpath%3Fed%3D2048\u0026alpn=h2,http/1.1#WS",
+  "servers": [
+   {
+    "name": "WS",
+    "group": 0,
+    "host": "ws.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "ws.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "alpn": [
+       "h2",
+       "http/1.1"
+      ],
+      "enabled": true,
+      "server_name": "cdn.example.com"
+     },
+     "transport": {
+      "early_data_header_name": "Sec-WebSocket-Protocol",
+      "headers": {
+       "Host": "cdn.example.com"
+      },
+      "max_early_data": 2048,
+      "path": "/path",
+      "type": "ws"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "trojan grpc, tls by default",
+  "sub": "trojan://p%40ss@tr.example.com:443?type=grpc\u0026serviceName=svc\u0026sni=sni.example.com#Trojan",
+  "servers": [
+   {
+    "name": "Trojan",
+    "group": 0,
+    "host": "tr.example.com",
+    "outbound": {
+     "password": "p@ss",
+     "server": "tr.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "enabled": true,
+      "server_name": "sni.example.com"
+     },
+     "transport": {
+      "service_name": "svc",
+      "type": "grpc"
+     },
+     "type": "trojan"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "vmess ws tls",
+  "sub": "vmess://eyJ2IjogIjIiLCAicHMiOiAi8J+Hs/Cfh7Eg0J3QuNC00LXRgNC70LDQvdC00Ysgdm1lc3MiLCAiYWRkIjogIm5sLmV4YW1wbGUuY29tIiwgInBvcnQiOiAiODQ0MyIsICJpZCI6ICIxMTExMTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTUiLCAiYWlkIjogIjAiLCAic2N5IjogIiIsICJuZXQiOiAid3MiLCAidHlwZSI6ICJub25lIiwgImhvc3QiOiAiY2RuLmV4YW1wbGUuY29tIiwgInBhdGgiOiAiL3ZtP2VkPTIwNDgiLCAidGxzIjogInRscyIsICJzbmkiOiAiIiwgImFscG4iOiAiaDIsaHR0cC8xLjEiLCAiZnAiOiAiZmlyZWZveCJ9",
+  "servers": [
+   {
+    "name": "🇳🇱 Нидерланды vmess",
+    "group": 0,
+    "host": "nl.example.com",
+    "outbound": {
+     "alter_id": 0,
+     "packet_encoding": "xudp",
+     "security": "auto",
+     "server": "nl.example.com",
+     "server_port": 8443,
+     "tag": "srv1",
+     "tls": {
+      "alpn": [
+       "h2",
+       "http/1.1"
+      ],
+      "enabled": true,
+      "server_name": "cdn.example.com",
+      "utls": {
+       "enabled": true,
+       "fingerprint": "firefox"
+      }
+     },
+     "transport": {
+      "early_data_header_name": "Sec-WebSocket-Protocol",
+      "headers": {
+       "Host": "cdn.example.com"
+      },
+      "max_early_data": 2048,
+      "path": "/vm",
+      "type": "ws"
+     },
+     "type": "vmess",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "ss sip002 and legacy",
+  "sub": "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpzZWNyZXQ@1.2.3.4:8388#SS%20one\nss://YWVzLTI1Ni1nY206cGE6c3NAWzIwMDE6ZGI4OjoxXTo0NDM=#SS%20two",
+  "servers": [
+   {
+    "name": "SS one",
+    "group": 0,
+    "host": "1.2.3.4",
+    "outbound": {
+     "method": "chacha20-ietf-poly1305",
+     "password": "secret",
+     "server": "1.2.3.4",
+     "server_port": 8388,
+     "tag": "srv1",
+     "type": "shadowsocks"
+    }
+   },
+   {
+    "name": "SS two",
+    "group": 0,
+    "host": "2001:db8::1",
+    "outbound": {
+     "method": "aes-256-gcm",
+     "password": "pa:ss",
+     "server": "2001:db8::1",
+     "server_port": 443,
+     "tag": "srv2",
+     "type": "shadowsocks"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "hy2 obfs insecure",
+  "sub": "hy2://pass@hy.example.com:8443/?sni=hy.sni.com\u0026insecure=1\u0026obfs=salamander\u0026obfs-password=ob#HY2",
+  "servers": [
+   {
+    "name": "HY2",
+    "group": 0,
+    "host": "hy.example.com",
+    "outbound": {
+     "obfs": {
+      "password": "ob",
+      "type": "salamander"
+     },
+     "password": "pass",
+     "server": "hy.example.com",
+     "server_port": 8443,
+     "tag": "srv1",
+     "tls": {
+      "alpn": [
+       "h3"
+      ],
+      "enabled": true,
+      "insecure": true,
+      "server_name": "hy.sni.com"
+     },
+     "type": "hysteria2"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "vless xhttp goes to xray",
+  "sub": "vless://11111111-2222-3333-4444-555555555555@xh.example.com:443?security=reality\u0026type=xhttp\u0026path=%2Fx\u0026mode=packet-up\u0026sni=s.example.com\u0026pbk=K\u0026sid=1\u0026spx=%2F#XHTTP",
+  "servers": [
+   {
+    "name": "XHTTP",
+    "group": 0,
+    "host": "xh.example.com",
+    "outbound": {
+     "server": "127.0.0.1",
+     "server_port": 0,
+     "tag": "srv1",
+     "type": "socks",
+     "version": "5"
+    },
+    "xray": {
+     "protocol": "vless",
+     "settings": {
+      "vnext": [
+       {
+        "address": "xh.example.com",
+        "port": 443,
+        "users": [
+         {
+          "encryption": "none",
+          "id": "11111111-2222-3333-4444-555555555555"
+         }
+        ]
+       }
+      ]
+     },
+     "streamSettings": {
+      "network": "xhttp",
+      "realitySettings": {
+       "fingerprint": "chrome",
+       "publicKey": "K",
+       "serverName": "s.example.com",
+       "shortId": "1",
+       "spiderX": "/"
+      },
+      "security": "reality",
+      "xhttpSettings": {
+       "mode": "packet-up",
+       "path": "/x"
+      }
+     }
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "tcp http header, ipv6 host",
+  "sub": "vless://11111111-2222-3333-4444-555555555555@[2001:db8::2]:80?type=tcp\u0026headerType=http\u0026host=a.com,b.com\u0026path=%2Fh#v6",
+  "servers": [
+   {
+    "name": "v6",
+    "group": 0,
+    "host": "2001:db8::2",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "2001:db8::2",
+     "server_port": 80,
+     "tag": "srv1",
+     "transport": {
+      "host": [
+       "a.com",
+       "b.com"
+      ],
+      "path": "/h",
+      "type": "http"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "httpupgrade",
+  "sub": "vless://11111111-2222-3333-4444-555555555555@hu.example.com:443?security=tls\u0026type=httpupgrade\u0026host=h.example.com#HU",
+  "servers": [
+   {
+    "name": "HU",
+    "group": 0,
+    "host": "hu.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "hu.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "enabled": true,
+      "server_name": "h.example.com"
+     },
+     "transport": {
+      "host": "h.example.com",
+      "path": "/",
+      "type": "httpupgrade"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "unsupported transport and protocol",
+  "sub": "vless://11111111-2222-3333-4444-555555555555@k.example.com:443?type=kcp#KCP\ntuic://u:p@t.example.com:443#TUIC\nvless://broken",
+  "servers": [],
+  "warnings": 3
+ },
+ {
+  "name": "base64 subscription, groups, duplicate names",
+  "sub": "dmxlc3M6Ly8xMTExMTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTVAYS5leGFtcGxlLmNvbTo0NDM/c2VjdXJpdHk9dGxzI1NlcnZlcgp2bGVzczovLzExMTExMTExLTIyMjItMzMzMy00NDQ0LTU1NTU1NTU1NTU1NUBiLmV4YW1wbGUuY29tOjQ0Mz9zZWN1cml0eT10bHMjU2VydmVyCnZsZXNzOi8vMTExMTExMTEtMjIyMi0zMzMzLTQ0NDQtNTU1NTU1NTU1NTU1QGMuZXhhbXBsZS5jb206NDQzP3NlY3VyaXR5PXRscyNMVEUlMjAlNULQkdC10LvRi9C1JTIw0YHQv9C40YHQutC4JTVEJTIwUnVzc2lhCnZsZXNzOi8vMTExMTExMTEtMjIyMi0zMzMzLTQ0NDQtNTU1NTU1NTU1NTU1QGQuZXhhbXBsZS5jb206NDQzP3NlY3VyaXR5PXRscyMlRjAlOUYlODclQjclRjAlOUYlODclQkElMjDQnNC+0YHQutCy0LAKdmxlc3M6Ly8xMTExMTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTVAZS5leGFtcGxlLmNvbTo0NDM/c2VjdXJpdHk9dGxzI9CQ0LLRgtC+JTIw0LLRi9Cx0L7RgAp2bGVzczovLzExMTExMTExLTIyMjItMzMzMy00NDQ0LTU1NTU1NTU1NTU1NUBmLmV4YW1wbGUuY29tOjQ0Mz9zZWN1cml0eT10bHM=",
+  "servers": [
+   {
+    "name": "Server",
+    "group": 0,
+    "host": "a.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "a.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "enabled": true,
+      "server_name": "a.example.com"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   },
+   {
+    "name": "Server (2)",
+    "group": 0,
+    "host": "b.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "b.example.com",
+     "server_port": 443,
+     "tag": "srv2",
+     "tls": {
+      "enabled": true,
+      "server_name": "b.example.com"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   },
+   {
+    "name": "LTE Белые списки Russia",
+    "group": 1,
+    "host": "c.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "c.example.com",
+     "server_port": 443,
+     "tag": "srv3",
+     "tls": {
+      "enabled": true,
+      "server_name": "c.example.com"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   },
+   {
+    "name": "🇷🇺 Москва",
+    "group": 2,
+    "host": "d.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "d.example.com",
+     "server_port": 443,
+     "tag": "srv4",
+     "tls": {
+      "enabled": true,
+      "server_name": "d.example.com"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   },
+   {
+    "name": "Авто выбор",
+    "group": 2,
+    "host": "e.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "e.example.com",
+     "server_port": 443,
+     "tag": "srv5",
+     "tls": {
+      "enabled": true,
+      "server_name": "e.example.com"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   },
+   {
+    "name": "f.example.com",
+    "group": 0,
+    "host": "f.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "f.example.com",
+     "server_port": 443,
+     "tag": "srv6",
+     "tls": {
+      "enabled": true,
+      "server_name": "f.example.com"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "sing-box outbound list",
+  "sub": "{\"outbounds\": [{\"type\": \"trojan\", \"tag\": \"sb-trojan\", \"server\": \"sb.example.com\", \"server_port\": 443, \"password\": \"pw\", \"tls\": {\"enabled\": true, \"server_name\": \"sb.example.com\"}, \"detour\": \"x\"}, {\"type\": \"direct\", \"tag\": \"direct\"}]}",
+  "servers": [
+   {
+    "name": "sb-trojan",
+    "group": 0,
+    "host": "sb.example.com",
+    "outbound": {
+     "password": "pw",
+     "server": "sb.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "enabled": true,
+      "server_name": "sb.example.com"
+     },
+     "type": "trojan"
+    }
+   }
+  ],
+  "warnings": 0
+ },
+ {
+  "name": "xray full configs",
+  "sub": "[{\"remarks\": \"🇫🇮 Финляндия xray\", \"outbounds\": [{\"protocol\": \"vless\", \"tag\": \"proxy\", \"settings\": {\"vnext\": [{\"address\": \"fi.example.com\", \"port\": 443, \"users\": [{\"id\": \"11111111-2222-3333-4444-555555555555\", \"encryption\": \"none\", \"flow\": \"xtls-rprx-vision\"}]}]}, \"streamSettings\": {\"network\": \"tcp\", \"security\": \"reality\", \"realitySettings\": {\"serverName\": \"www.microsoft.com\", \"fingerprint\": \"chrome\", \"publicKey\": \"PBK\", \"shortId\": \"ab\"}}}, {\"protocol\": \"freedom\", \"tag\": \"direct\"}, {\"protocol\": \"blackhole\", \"tag\": \"block\"}]}, {\"remarks\": \"Auto\", \"outbounds\": [{\"protocol\": \"vless\", \"tag\": \"proxy\", \"settings\": {\"vnext\": [{\"address\": \"auto.example.com\", \"port\": 443, \"users\": [{\"id\": \"11111111-2222-3333-4444-555555555555\"}]}]}, \"streamSettings\": {\"network\": \"ws\", \"security\": \"tls\", \"wsSettings\": {\"path\": \"/ws\"}, \"tlsSettings\": {\"serverName\": \"auto.example.com\"}}}]}]",
+  "servers": [
+   {
+    "name": "🇫🇮 Финляндия xray",
+    "group": 0,
+    "host": "fi.example.com",
+    "outbound": {
+     "flow": "xtls-rprx-vision",
+     "packet_encoding": "xudp",
+     "server": "fi.example.com",
+     "server_port": 443,
+     "tag": "srv1",
+     "tls": {
+      "enabled": true,
+      "reality": {
+       "enabled": true,
+       "public_key": "PBK",
+       "short_id": "ab"
+      },
+      "server_name": "www.microsoft.com",
+      "utls": {
+       "enabled": true,
+       "fingerprint": "chrome"
+      }
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   },
+   {
+    "name": "Auto",
+    "group": 2,
+    "host": "auto.example.com",
+    "outbound": {
+     "packet_encoding": "xudp",
+     "server": "auto.example.com",
+     "server_port": 443,
+     "tag": "srv2",
+     "tls": {
+      "enabled": true,
+      "server_name": "auto.example.com"
+     },
+     "transport": {
+      "path": "/ws",
+      "type": "ws"
+     },
+     "type": "vless",
+     "uuid": "11111111-2222-3333-4444-555555555555"
+    }
+   }
+  ],
+  "warnings": 0
+ }
+]

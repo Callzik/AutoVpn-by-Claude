@@ -1,2 +1,7 @@
 *.keystore
 build/
+out/
+windows/bin/
+windows/Dash.exe
+windows/*.syso
+tools/
