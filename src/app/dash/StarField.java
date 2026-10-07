@@ -16,7 +16,7 @@ public class StarField extends View {
     private final Paint tailP = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Random crnd = new Random();
     // background comet: flies by every few seconds
-    private long cStart = -1, cNext = android.os.SystemClock.uptimeMillis() + 3000;
+    private long cStart = -1, cNext = android.os.SystemClock.uptimeMillis() + 1200;
     private float cx0, cy0, cdx, cdy, cDist;
     private static final long C_DUR = 1400;
 
@@ -25,7 +25,7 @@ public class StarField extends View {
         setWillNotDraw(false);
         tailP.setStyle(Paint.Style.STROKE);
         tailP.setStrokeCap(Paint.Cap.ROUND);
-        tailP.setStrokeWidth(Ui.dp(c, 3.5f));
+        tailP.setStrokeWidth(Ui.dp(c, 2));
     }
 
     /** Returns true while a comet is in flight (needs smooth frames). */
@@ -43,26 +43,26 @@ public class StarField extends View {
         float t = (now - cStart) / (float) C_DUR;
         if (t >= 1f) {
             cStart = -1;
-            cNext = now + 7000 + crnd.nextInt(9000);
+            cNext = now + 1500 + crnd.nextInt(3000);
             return false;
         }
         float e = 1f - (1f - t) * (1f - t); // ease-out
         float fade = t < 0.15f ? t / 0.15f : t > 0.7f ? (1f - t) / 0.3f : 1f;
         float dp = Ui.dp(getContext(), 1);
         float hx = cx0 + cdx * cDist * e, hy = cy0 + cdy * cDist * e;
-        float len = dp * 210 * (0.4f + 0.6f * fade);
+        float len = dp * 120 * (0.4f + 0.6f * fade);
         float tx = hx - cdx * len, ty = hy - cdy * len;
         int acc = Ui.ACCENT & 0x00FFFFFF;
         tailP.setShader(new android.graphics.LinearGradient(tx, ty, hx, hy,
                 acc, (Math.round(0.85f * fade * 255) << 24) | acc, android.graphics.Shader.TileMode.CLAMP));
         c.drawLine(tx, ty, hx, hy, tailP);
         tailP.setShader(null);
-        p.setShader(new android.graphics.RadialGradient(hx, hy, dp * 16,
+        p.setShader(new android.graphics.RadialGradient(hx, hy, dp * 9,
                 new int[]{(Math.round(0.5f * fade * 255) << 24) | acc, acc}, null, android.graphics.Shader.TileMode.CLAMP));
-        c.drawCircle(hx, hy, dp * 16, p);
+        c.drawCircle(hx, hy, dp * 9, p);
         p.setShader(null);
         p.setColor((Math.round(fade * 255) << 24) | 0xE6E1FF);
-        c.drawCircle(hx, hy, dp * 3.6f, p);
+        c.drawCircle(hx, hy, dp * 2.2f, p);
         return true;
     }
 
