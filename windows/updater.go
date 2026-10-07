@@ -71,21 +71,42 @@ func newer(a, b string) bool {
 	return false
 }
 
+// getSmall fetches a small text file (version.json and its signature).
+func getSmall(cl *http.Client, url string) ([]byte, error) {
+	resp, err := cl.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+}
+
 func (u *Updater) Check() {
 	cl := &http.Client{Timeout: 20 * time.Second}
-	resp, err := cl.Get(versionURL)
+	body, err := getSmall(cl, versionURL)
 	if err != nil {
 		u.log.Add("Проверка обновлений: нет связи с GitHub")
 		return
 	}
-	defer resp.Body.Close()
+	sig, err := getSmall(cl, versionURL+".sig")
+	if err == nil {
+		err = verifyManifest(body, sig)
+	}
+	if err != nil {
+		// only a manifest signed with the release key may point the updater at a new Dash.exe
+		u.log.Add("Проверка обновлений: подпись не прошла (" + err.Error() + ")")
+		return
+	}
 	var v struct {
 		Windows struct {
 			Version string `json:"version"`
 			URL     string `json:"url"`
 		} `json:"windows"`
 	}
-	if resp.StatusCode != 200 || json.NewDecoder(resp.Body).Decode(&v) != nil || v.Windows.URL == "" {
+	if json.Unmarshal(body, &v) != nil || v.Windows.URL == "" {
 		return
 	}
 	u.mu.Lock()
