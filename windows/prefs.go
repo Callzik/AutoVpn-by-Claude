@@ -30,6 +30,7 @@ type PrefsData struct {
 	HWID       string            `json:"hwid"`
 	TunAddr    int               `json:"tun_addr"`
 	AutoStart  bool              `json:"connect_on_start"`
+	BypassApps []string          `json:"bypass_apps"`
 }
 
 func LoadPrefs(dir string) *Prefs {
@@ -65,6 +66,7 @@ func (p *Prefs) Get() PrefsData {
 	d := p.D
 	d.Subs = append([]string{}, p.D.Subs...)
 	d.Off = append([]string{}, p.D.Off...)
+	d.BypassApps = append([]string{}, p.D.BypassApps...)
 	names := map[string]string{}
 	for k, v := range p.D.Names {
 		names[k] = v

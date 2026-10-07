@@ -35,6 +35,8 @@ public class MainActivity extends Activity {
 
     private TextView netChip, title, subtitle, banner, wlBadge, srvName, srvSub, srvBadge, pingBtn, errorText;
     private PowerButton power;
+    private LinearLayout updCard;
+    private TextView updText, updBtn;
     private EditText subInput;
     private TextView subError;
 
@@ -78,6 +80,11 @@ public class MainActivity extends Activity {
 
     /** Tile / widget asked to connect but needed the screen (permission or subscription). */
     private void handleIntent(Intent intent) {
+        if (intent != null && Updater.ACTION_STATUS.equals(intent.getAction())) {
+            Updater.onStatus(this, intent);
+            intent.setAction(null);
+            return;
+        }
         if (intent == null || !intent.getBooleanExtra(VpnControl.EXTRA_CONNECT, false)) return;
         intent.removeExtra(VpnControl.EXTRA_CONNECT);
         if (AppState.vpn == AppState.OFF && !prefs.subUrl().trim().isEmpty()) toggle();
@@ -88,6 +95,7 @@ public class MainActivity extends Activity {
         AppState.addListener(listener);
         handler.post(ticker);
         showScreen();
+        Updater.check(this, false);
     }
 
     @Override protected void onPause() {
@@ -164,7 +172,23 @@ public class MainActivity extends Activity {
         banner.setVisibility(View.GONE);
         col.addView(banner, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0));
 
-        // tiles: ping (tap = re-ping), alive, white lists
+        // update available
+        updCard = Ui.row(c);
+        updCard.setBackground(Ui.round(c, Ui.ACCENT_TINT, 16, 0));
+        updCard.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 10), Ui.dp(c, 10));
+        updText = Ui.text(c, "", 14, 0xFFD9D3FF, false);
+        updCard.addView(updText, Ui.weight());
+        updBtn = Ui.text(c, "Обновить", 14, Ui.ACCENT_INK, true);
+        updBtn.setBackground(Ui.round(c, Ui.ACCENT, 12, 0));
+        updBtn.setPadding(Ui.dp(c, 14), Ui.dp(c, 8), Ui.dp(c, 14), Ui.dp(c, 8));
+        updBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { Updater.start(MainActivity.this); }
+        });
+        updCard.addView(updBtn);
+        updCard.setVisibility(View.GONE);
+        col.addView(updCard, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
+
+        // tiles: ping (tap = re-ping), white lists
         LinearLayout tiles = new LinearLayout(c);
         tiles.setOrientation(LinearLayout.HORIZONTAL);
         pingBtn = tile(tiles, "Пинг", true);
@@ -279,6 +303,18 @@ public class MainActivity extends Activity {
             boolean ok = AppState.bannerTone == 1;
             banner.setBackground(Ui.round(this, ok ? Ui.ACCENT_TINT : Ui.WARN_TINT, 14, 0));
             banner.setTextColor(ok ? 0xFFD9D3FF : Ui.WARN_FG);
+        }
+
+        // update card
+        boolean upd = !Updater.newVersion.isEmpty();
+        updCard.setVisibility(upd ? View.VISIBLE : View.GONE);
+        if (upd) {
+            int pr = Updater.progress;
+            updText.setText(pr == 101 ? "Установка " + Updater.newVersion + "…"
+                    : pr >= 0 ? "Загрузка " + Updater.newVersion + " · " + pr + "%"
+                    : !Updater.error.isEmpty() ? Updater.error : "Доступна версия " + Updater.newVersion);
+            updBtn.setVisibility(pr >= 0 ? View.GONE : View.VISIBLE);
+            updBtn.setText(Updater.error.isEmpty() ? "Обновить" : "Ещё раз");
         }
 
         // tile: ping

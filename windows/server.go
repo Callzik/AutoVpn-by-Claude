@@ -16,6 +16,7 @@ type API struct {
 	core  *Core
 	prefs *Prefs
 	log   *Log
+	upd   *Updater
 	token string
 	quit  func()
 }
@@ -47,7 +48,34 @@ func (a *API) handler() http.Handler {
 		}
 		return m
 	}
-	api("/api/state", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, a.core.View()) })
+	api("/api/state", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"s": a.core.View(), "update": a.upd.View()})
+	})
+	api("/api/update/install", func(w http.ResponseWriter, r *http.Request) { a.upd.Install(); writeJSON(w, true) })
+	api("/api/update/check", func(w http.ResponseWriter, r *http.Request) { a.upd.Check(); writeJSON(w, a.upd.View()) })
+	api("/api/apps", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"bypass": a.prefs.Get().BypassApps, "running": runningApps()})
+	})
+	api("/api/apps/set", func(w http.ResponseWriter, r *http.Request) {
+		var list []string
+		seen := map[string]bool{}
+		if arr, ok := body(r)["list"].([]any); ok {
+			for _, v := range arr {
+				n := strings.TrimSpace(str(v))
+				if n == "" || seen[strings.ToLower(n)] {
+					continue
+				}
+				if !strings.HasSuffix(strings.ToLower(n), ".exe") {
+					n += ".exe"
+				}
+				seen[strings.ToLower(n)] = true
+				list = append(list, n)
+			}
+		}
+		a.prefs.Update(func(d *PrefsData) { d.BypassApps = list })
+		a.core.Restart()
+		writeJSON(w, true)
+	})
 	api("/api/toggle", func(w http.ResponseWriter, r *http.Request) { a.core.Toggle(); writeJSON(w, true) })
 	api("/api/servers", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"servers": a.core.Servers(), "pinned": a.prefs.Get().Pinned})

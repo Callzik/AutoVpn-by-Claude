@@ -11,7 +11,7 @@ import (
 // Test build for Linux: serves the UI and runs the cores from DASH_BIN.
 func main() {
 	bin := os.Getenv("DASH_BIN")
-	app, err := NewApp(bin)
+	app, err := NewApp(bin, false)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

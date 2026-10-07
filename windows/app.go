@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-const Version = "1.4.7"
+const Version = "1.4.8"
 
 //go:embed assets/rules/*.srs
 var rulesFS embed.FS
@@ -36,10 +36,11 @@ type App struct {
 	Log   *Log
 	Core  *Core
 	API   *API
+	Upd   *Updater
 	Addr  string
 }
 
-func NewApp(binDir string) (*App, error) {
+func NewApp(binDir string, connect bool) (*App, error) {
 	dir := dataRoot()
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
@@ -50,14 +51,15 @@ func NewApp(binDir string) (*App, error) {
 	}
 	a := &App{Dir: dir, Prefs: LoadPrefs(dir), Log: &Log{}}
 	a.Core = NewCore(a.Prefs, dir, binDir, ruleDir, a.Log)
-	a.API = &API{core: a.Core, prefs: a.Prefs, log: a.Log, token: randHex(16)}
+	a.Upd = NewUpdater(dir, a.Log)
+	a.API = &API{core: a.Core, prefs: a.Prefs, log: a.Log, upd: a.Upd, token: randHex(16)}
 	addr, err := a.API.Serve()
 	if err != nil {
 		return nil, err
 	}
 	a.Addr = addr
 	a.Log.Add("Dash " + Version + " для Windows")
-	if d := a.Prefs.Get(); d.AutoStart && len(d.Subs) > 0 {
+	if d := a.Prefs.Get(); (d.AutoStart || connect) && len(d.Subs) > 0 {
 		a.Core.Connect()
 	}
 	return a, nil

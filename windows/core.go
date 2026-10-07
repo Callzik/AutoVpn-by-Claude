@@ -559,7 +559,7 @@ func (c *Core) startSingBox(g int, servers []*Server, group string, idx int) (ok
 	cfg, err := BuildSingBox(servers, BuildOptions{
 		RuDirect: c.prefs.Get().RuDirect, BlockedVPN: c.prefs.Get().BlockedVPN,
 		RuleDir: c.ruleDir, Secret: secret, ClashPort: port, InitialGroup: group,
-		TunName: "Dash", TunAddr4: tunAddrs[idx][0], TunAddr6: tunAddrs[idx][1], BypassProcs: bypassProcs()})
+		TunName: "Dash", TunAddr4: tunAddrs[idx][0], TunAddr6: tunAddrs[idx][1], BypassProcs: append(bypassProcs(), c.prefs.Get().BypassApps...)})
 	if err != nil {
 		return false, false, err
 	}

@@ -91,6 +91,10 @@ h1{font-size:21px;font-weight:700;flex:1}
 pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word;-webkit-user-select:text;user-select:text}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2A2737;color:var(--fg);padding:9px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%}
 .toast.on{opacity:1}
+.upd{display:flex;align-items:center;gap:10px;background:var(--accent-tint);color:#D9D3FF;border-radius:16px;padding:10px 10px 10px 16px;margin-bottom:10px;font-size:14px}
+.ubtn{background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:7px 14px;font-weight:700;font-size:14px}
+.chk{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--line2);display:grid;place-items:center;flex:none;font-size:14px;font-weight:700;color:var(--accent-ink)}
+.chk.on{background:var(--accent);border-color:var(--accent)}
 .menu{position:fixed;background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:4px;display:none;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .menu button{display:block;width:100%;text-align:left;padding:8px 14px;border-radius:8px;font-size:14px}
 .menu button:hover{background:var(--line)}
@@ -115,6 +119,7 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
     <div class="err" id="err"></div>
   </div>
   <div id="bannerbox"></div>
+  <div class="upd" id="upd" style="display:none"><span class="grow" id="updtext"></span><button class="ubtn" id="updbtn" onclick="api('/api/update/install').then(poll)">Обновить</button></div>
   <div class="tiles">
     <div class="tile clickable" title="Проверить пинг текущего сервера" onclick="if(S.state==='on')api('/api/ping-current').then(poll)"><div class="m">Пинг</div><div class="v" id="t-ping">—</div></div>
     <div class="tile"><div class="m">Режим</div><div class="v t" id="t-mode">Авто</div></div>
@@ -153,6 +158,10 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
       <div class="row"><div class="grow"><div class="b">Российские сайты напрямую</div><div class="m">Без VPN: банки, Госуслуги, маркетплейсы</div></div><div class="switch" id="sw-ru" onclick="setOpt('ruDirect',this)"></div></div>
       <div class="row" style="margin-top:14px"><div class="grow"><div class="b">Заблокированное в РФ — через VPN</div><div class="m">Даже если сайт в зоне .ru</div></div><div class="switch" id="sw-bl" onclick="setOpt('blockedVpn',this)"></div></div>
     </div>
+    <div class="section">Приложения без VPN</div>
+    <div class="card clickable" onclick="show('apps')">
+      <div class="row"><div class="grow"><div class="b">Выбранные приложения</div><div class="m ell" id="appsum">Весь трафик идёт через VPN</div></div><span class="m" style="font-size:20px">›</span></div>
+    </div>
     <div class="section">Запуск</div>
     <div class="card">
       <div class="row"><div class="grow"><div class="b">Подключаться при запуске</div><div class="m">Сразу включать VPN, когда открывается Dash</div></div><div class="switch" id="sw-as" onclick="setAuto(this)"></div></div>
@@ -164,8 +173,17 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
     </div>
     <div class="section">О приложении</div>
     <div class="card"><div class="m">Dash для Windows · ядра sing-box и Xray-core · создано с помощью Claude.<br>Весь трафик ПК идёт через VPN-адаптер, российские сайты — напрямую. Упавшее ядро перезапускается само, после сна соединение проверяется заново.</div>
-      <button class="secondary" style="width:100%;margin-top:12px" onclick="api('/api/quit')">Отключить и выйти</button></div>
+      <button class="secondary" style="width:100%;margin-top:12px" onclick="checkUpd()">Проверить обновления</button>
+      <button class="secondary" style="width:100%;margin-top:10px" onclick="api('/api/quit')">Отключить и выйти</button></div>
   </div>
+</section>
+
+<!-- apps without VPN -->
+<section class="view" id="v-apps">
+  <div class="top"><button class="back" onclick="leaveApps()">←</button><h1>Приложения без VPN</h1></div>
+  <div class="m" style="margin-top:10px">Трафик отмеченных программ идёт напрямую, мимо VPN. Список — запущенные сейчас программы; если нужной нет, запустите её или впишите имя файла.</div>
+  <input class="field" id="appsearch" placeholder="Поиск или имя программы, например game.exe" style="margin-top:12px" oninput="renderApps()" onkeydown="if(event.key==='Enter')addManual()">
+  <div class="scroll" id="applist"></div>
 </section>
 
 <!-- onboarding -->
@@ -202,12 +220,17 @@ function show(v){
   view=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
   if(v==='servers'){offChanged=false;loadServers();if(S.state==='on')api('/api/ping-all')}
   if(v==='settings')loadSettings();
+  if(v==='apps')loadApps();
 }
 function dur(sec){sec=Math.max(0,sec);const p=n=>String(n).padStart(2,'0');return p(Math.floor(sec/3600))+':'+p(Math.floor(sec/60)%60)+':'+p(sec%60)}
 function pc(p){return p<150?'good':p<400?'mid':'bad'}
 
 async function poll(){
-  try{S=await api('/api/state')}catch(e){return}
+  let R;try{R=await api('/api/state')}catch(e){return}
+  S=R.s;const U=R.update||{};
+  const ub=$('upd');ub.style.display=U.version?'':'none';
+  if(U.version){$('updtext').textContent=U.progress===101?'Установка '+U.version+'…':U.progress>=0?'Загрузка '+U.version+' · '+U.progress+'%':U.error||('Доступна версия '+U.version);
+    $('updbtn').style.display=U.progress>=0?'none':'';$('updbtn').textContent=U.error?'Ещё раз':'Обновить'}
   $('ver').textContent='v'+S.version;$('ver2').textContent='версия '+S.version;
   if(!S.hasSubs && view!=='onb'){show('onb');return}
   if(S.hasSubs && view==='onb'){show('main')}
@@ -279,6 +302,8 @@ async function loadSettings(){
     +(r.summary?'\n'+r.summary:'')+'\nСерверы всех подписок объединяются. Пока VPN включён, подписки обновляются сами раз в 12 часов.';
   $('subinfo').style.whiteSpace='pre-line';
   $('sw-ru').classList.toggle('on',!!r.ruDirect);$('sw-bl').classList.toggle('on',!!r.blockedVpn);$('sw-as').classList.toggle('on',!!r.autoStart);
+  const ap=await api('/api/apps');const bl=ap.bypass||[];
+  $('appsum').textContent=bl.length?bl.map(n=>n.replace(/\.exe$/i,'')).join(', '):'Весь трафик идёт через VPN';
   const lg=await api('/api/log');$('log').textContent=lg.text||'Пока пусто';
 }
 let confirmed=null;
@@ -354,6 +379,22 @@ function orbitFrame(now){
   OB.raf=requestAnimationFrame(orbitFrame);
 }
 orbitFrame(0);
+/* apps without VPN */
+let APPS={bypass:[],running:[]},appsChanged=false;
+async function loadApps(){appsChanged=false;APPS=await api('/api/apps');APPS.bypass=APPS.bypass||[];APPS.running=APPS.running||[];renderApps()}
+function renderApps(){
+  const q=$('appsearch').value.trim().toLowerCase(),sel=new Set(APPS.bypass.map(x=>x.toLowerCase()));
+  const all=[...APPS.bypass,...APPS.running.filter(n=>!sel.has(n.toLowerCase()))].filter(n=>!q||n.toLowerCase().includes(q));
+  let h=all.map(n=>{const on=sel.has(n.toLowerCase());return `<div class="item" data-n="${esc(n)}"><div class="grow b ell">${esc(n.replace(/\.exe$/i,''))}<span class="m"> ${esc(n.match(/\.exe$/i)?'.exe':'')}</span></div><span class="chk ${on?'on':''}">${on?'✓':''}</span></div>`}).join('');
+  if(q&&!all.some(n=>n.toLowerCase()===q||n.toLowerCase()===q+'.exe'))h+=`<div class="item" onclick="addManual()"><div class="grow"><div class="b">Добавить «${esc($('appsearch').value.trim())}»</div><div class="m">Если программа сейчас не запущена</div></div><span class="pv good">+</span></div>`;
+  if(!h)h='<div class="m" style="padding:14px 4px">Ничего не найдено</div>';
+  $('applist').innerHTML=h;
+  $('applist').querySelectorAll('.item[data-n]').forEach(el=>el.onclick=()=>toggleApp(el.dataset.n));
+}
+function toggleApp(n){const i=APPS.bypass.findIndex(x=>x.toLowerCase()===n.toLowerCase());if(i>=0)APPS.bypass.splice(i,1);else APPS.bypass.push(n);appsChanged=true;renderApps()}
+function addManual(){let n=$('appsearch').value.trim();if(!n)return;if(!/\.exe$/i.test(n))n+='.exe';if(!APPS.bypass.some(x=>x.toLowerCase()===n.toLowerCase()))APPS.bypass.push(n);appsChanged=true;$('appsearch').value='';renderApps()}
+async function leaveApps(){show('settings');if(appsChanged){await api('/api/apps/set',{list:APPS.bypass});if(S.state!=='off')toast('Переподключение для применения');loadSettings()}appsChanged=false}
+async function checkUpd(){toast('Проверка…');const r=await api('/api/update/check');toast(r.version?'Доступна версия '+r.version:'Установлена последняя версия');poll()}
 show('main');poll();setInterval(poll,1000);
 setInterval(()=>{if(view==='settings')api('/api/log').then(r=>$('log').textContent=r.text||'Пока пусто')},3000);
 </script>

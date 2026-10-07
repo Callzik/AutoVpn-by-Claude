@@ -47,3 +47,8 @@ func dataRoot() string {
 	}
 	return filepath.Join(os.TempDir(), "dash-test")
 }
+
+func runningApps() []string                 { return nil }
+func swapExe(newExe string) (string, error) { return newExe, nil }
+func cleanupOldExe()                        {}
+func waitPid(pid int)                       {}

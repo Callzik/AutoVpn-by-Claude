@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"unsafe"
 
 	"github.com/jchv/go-webview2"
@@ -94,6 +95,18 @@ func attachToJob(cmd *exec.Cmd) {
 }
 
 func main() {
+	connect := false
+	for i, a := range os.Args {
+		if a == "--after-update" && i+1 < len(os.Args) {
+			if pid, err := strconv.Atoi(os.Args[i+1]); err == nil {
+				waitPid(pid)
+			}
+		}
+		if a == "--connect" {
+			connect = true
+		}
+	}
+	cleanupOldExe()
 	if !singleInstance() {
 		return
 	}
@@ -111,7 +124,7 @@ func main() {
 			return
 		}
 	}
-	app, err := NewApp(binDir)
+	app, err := NewApp(binDir, connect)
 	if err != nil {
 		msgBox("Не удалось запустить: " + err.Error())
 		return
@@ -133,6 +146,26 @@ func main() {
 		return
 	}
 	app.API.quit = func() { w.Dispatch(func() { w.Terminate() }) }
+	app.Upd.restart = func(newExe string) {
+		wasOn := app.Core.View().State != StOff
+		self, err := swapExe(newExe)
+		if err != nil {
+			app.Log.Add("Не удалось заменить Dash.exe: " + err.Error())
+			app.Upd.fail("Не удалось установить обновление")
+			return
+		}
+		app.Core.Disconnect("Обновление")
+		args := []string{"--after-update", strconv.Itoa(os.Getpid())}
+		if wasOn {
+			args = append(args, "--connect")
+		}
+		if err := exec.Command(self, args...).Start(); err != nil {
+			app.Log.Add("Не удалось запустить новую версию: " + err.Error())
+			app.Upd.fail("Перезапустите Dash вручную")
+			return
+		}
+		app.API.quit()
+	}
 	w.SetSize(440, 820, webview2.HintMin)
 	w.Navigate(app.URL())
 	w.Run()
