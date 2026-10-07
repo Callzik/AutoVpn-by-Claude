@@ -25,6 +25,8 @@ public class PowerButton extends View {
     private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
+    private final android.graphics.Path path = new android.graphics.Path();
+    private final android.graphics.Matrix matrix = new android.graphics.Matrix();
 
     public PowerButton(Context c) {
         super(c);
@@ -66,7 +68,7 @@ public class PowerButton extends View {
 
     private float targetTail() {
         if (state == AppState.CONNECTING) return 110f;
-        if (state == AppState.ON || state == AppState.WAITING) return 70f;
+        if (state == AppState.ON || state == AppState.WAITING) return 85f;
         return 0f;
     }
 
@@ -163,16 +165,34 @@ public class PowerButton extends View {
         // comet
         if (tail > 0.5f) {
             float k = Math.min(1f, tail / 70f); // fades in/out with the tail
-            rect.set(cx - R, cy - R, cx + R, cy + R);
-            int n = 14;
-            float seg = tail / n;
-            float maxW = Ui.dp(ctx, 6);
-            for (int i = 0; i < n; i++) {
-                float f = (i + 1) / (float) n; // 0 → tail end, 1 → head
-                arc.setStrokeWidth(maxW * (0.25f + 0.75f * f));
-                arc.setColor(alpha(accent, k * f * f * 0.95f));
-                c.drawArc(rect, angle - tail + i * seg, seg + 0.3f, false, arc);
+            // one solid tapered shape filled with a sweep gradient: no seams between pieces
+            float maxW = Ui.dp(ctx, 6.5f);
+            int n = 48;
+            path.reset();
+            for (int i = 0; i <= n; i++) {
+                float f = i / (float) n; // 0 → tail end, 1 → head
+                double th = Math.toRadians(angle - tail + tail * f);
+                float r = R + maxW * (0.08f + 0.92f * f) / 2f;
+                float x = cx + r * (float) Math.cos(th), y = cy + r * (float) Math.sin(th);
+                if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
             }
+            for (int i = n; i >= 0; i--) {
+                float f = i / (float) n;
+                double th = Math.toRadians(angle - tail + tail * f);
+                float r = R - maxW * (0.08f + 0.92f * f) / 2f;
+                path.lineTo(cx + r * (float) Math.cos(th), cy + r * (float) Math.sin(th));
+            }
+            path.close();
+            float p = tail / 360f;
+            android.graphics.SweepGradient sg = new android.graphics.SweepGradient(cx, cy,
+                    new int[]{alpha(accent, 0), alpha(accent, 0.25f * k), alpha(accent, 0.95f * k), alpha(accent, 0.95f * k), alpha(accent, 0)},
+                    new float[]{0f, p * 0.5f, p, Math.min(1f, p + 0.002f), Math.min(1f, p + 0.004f)});
+            matrix.setRotate(angle - tail, cx, cy);
+            sg.setLocalMatrix(matrix);
+            arc.setStyle(Paint.Style.FILL);
+            arc.setShader(sg);
+            c.drawPath(path, arc);
+            arc.setShader(null);
             double a = Math.toRadians(angle);
             float hx = cx + R * (float) Math.cos(a), hy = cy + R * (float) Math.sin(a);
             float hr = Ui.dp(ctx, 7);
