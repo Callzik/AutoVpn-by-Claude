@@ -41,3 +41,7 @@ Versions of the cores and the toolchain are pinned in [`versions.env`](versions.
 ## Выпуск релиза
 
 Бинарники в git не коммитятся. Сначала код и номер версии (`build.sh`, `windows/main*.go`) мержатся в main, затем в отдельную ветку от main пушатся `dist/Dash-<версия>.apk` и/или `dist/Dash-Windows-<версия>.zip` (`git add -f`, папка в `.gitignore`) и `version.json` с новыми `version`/`code`. Workflow [`release.yml`](.github/workflows/release.yml) создаёт релиз `android-v<версия>` / `windows-v<версия>`, прописывает в `version.json` на main ссылку и `sha256` и удаляет ветку. Приложения сверяют SHA-256 скачанного файла перед установкой.
+
+### Android одной кнопкой
+
+Ключ подписи APK лежит в `keystore/dash-release.p12` (зашифрован паролем, пароль только в секрете репозитория `DASH_KS_PASS`). Чтобы выпустить Android: поднять версию в `build.sh` и `AndroidManifest.xml`, смержить в main, затем Actions → `release-android` → Run workflow. Workflow соберёт подписанный APK, создаст релиз `android-v<версия>` и пропишет `url` и `sha256` в `version.json`. Ключ нельзя менять: приложение обновится поверх старого только при той же подписи.

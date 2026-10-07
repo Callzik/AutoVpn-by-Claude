@@ -77,6 +77,12 @@ jobs:
             echo "DASH_KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
             echo "DASH_KS_ALIAS=${KS_ALIAS:-dash}" >> "$GITHUB_ENV"
             echo "APK_SUFFIX=" >> "$GITHUB_ENV"
+          elif [ -n "$KS_PASS" ]; then
+            # release key kept in the repo (keystore/dash-release.p12), opened with the DASH_KS_PASS secret
+            cp keystore/dash-release.p12 "$KS"
+            echo "DASH_KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
+            echo "DASH_KS_ALIAS=${KS_ALIAS:-dash}" >> "$GITHUB_ENV"
+            echo "APK_SUFFIX=" >> "$GITHUB_ENV"
           else
             # no release key in this repo's secrets: throwaway key, the APK is for testing only
             P=$(openssl rand -hex 16)
