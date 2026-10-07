@@ -125,7 +125,7 @@ public class PowerButton extends View {
         Context ctx = getContext();
         float w = getWidth(), h = getHeight();
         float cx = w / 2f, cy = h / 2f;
-        float R = Math.min(w, h) / 2f - Ui.dp(ctx, 12);
+        float R = Math.min(w, h) / 2f - Ui.dp(ctx, 18); // room for the comet halo
         float rb = 0.62f * R;
 
         int accent = state == AppState.WAITING ? Ui.WARN : Ui.ACCENT;
@@ -196,8 +196,12 @@ public class PowerButton extends View {
             double a = Math.toRadians(angle);
             float hx = cx + R * (float) Math.cos(a), hy = cy + R * (float) Math.sin(a);
             float hr = Ui.dp(ctx, 7);
-            dot.setColor(alpha(accent, 0.25f * k));
-            c.drawCircle(hx, hy, hr * 2f, dot);
+            // soft halo, fades to nothing at its edge
+            dot.setShader(new android.graphics.RadialGradient(hx, hy, hr * 2.2f,
+                    new int[]{alpha(accent, 0.45f * k), alpha(accent, 0.18f * k), alpha(accent, 0)},
+                    new float[]{0.3f, 0.6f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+            c.drawCircle(hx, hy, hr * 2.2f, dot);
+            dot.setShader(null);
             dot.setColor(alpha(accent, k));
             c.drawCircle(hx, hy, hr, dot);
             dot.setColor(alpha(0xFFFFFFFF, 0.8f * k));

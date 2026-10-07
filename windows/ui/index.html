@@ -302,7 +302,7 @@ function orbitFrame(now){
   const dt=OB.last?Math.min(100,now-OB.last):0;OB.last=now;
   const st=OB.st,speed={connecting:320,waiting:110,on:36}[st]||0,tt={connecting:110,waiting:85,on:85}[st]||0;
   OB.angle=(OB.angle+speed*dt/1000)%360;OB.tail+=(tt-OB.tail)*Math.min(1,dt/250);
-  const cv=$('orbit'),c=cv.getContext('2d'),W=cv.width,k2=W/250,cx=W/2,R=(125-12)*k2,rb=70*k2;
+  const cv=$('orbit'),c=cv.getContext('2d'),W=cv.width,k2=W/250,cx=W/2,R=(125-18)*k2,rb=70*k2;
   c.clearRect(0,0,W,W);
   const acc=st==='waiting'?'242,181,68':'139,124,255';
   c.lineWidth=2*k2;c.strokeStyle='#24222E';c.beginPath();c.arc(cx,cx,R,0,7);c.stroke();
@@ -317,7 +317,7 @@ function orbitFrame(now){
     g.addColorStop(0,`rgba(${acc},0)`);g.addColorStop(p*.5,`rgba(${acc},${.25*k})`);g.addColorStop(p,`rgba(${acc},${.95*k})`);g.addColorStop(Math.min(1,p+.004),`rgba(${acc},0)`);
     c.fillStyle=g;c.fill();
     const hx=cx+R*Math.cos(rad(OB.angle)),hy=cx+R*Math.sin(rad(OB.angle)),hr=7*k2;
-    c.fillStyle=`rgba(${acc},${.25*k})`;c.beginPath();c.arc(hx,hy,hr*2,0,7);c.fill();
+    {const h=c.createRadialGradient(hx,hy,0,hx,hy,hr*2.2);h.addColorStop(.3,`rgba(${acc},${.45*k})`);h.addColorStop(.6,`rgba(${acc},${.18*k})`);h.addColorStop(1,`rgba(${acc},0)`);c.fillStyle=h;c.beginPath();c.arc(hx,hy,hr*2.2,0,7);c.fill()}
     c.fillStyle=`rgba(${acc},${k})`;c.beginPath();c.arc(hx,hy,hr,0,7);c.fill();
     c.fillStyle=`rgba(255,255,255,${.8*k})`;c.beginPath();c.arc(hx-hr*.3,hy-hr*.3,hr*.35,0,7);c.fill();
   }

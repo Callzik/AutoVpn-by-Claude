@@ -16,13 +16,13 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 
 ## Скачать
 
-Готовый APK (arm64): [`apk/Dash-1.9.1.apk`](apk/Dash-1.9.1.apk). Разреши установку из неизвестных источников и вставь ссылку подписки.
+Готовый APK (arm64): [`apk/Dash-1.9.2.apk`](apk/Dash-1.9.2.apk). Разреши установку из неизвестных источников и вставь ссылку подписки.
 
 Серверы с транспортом xhttp идут через встроенное ядро [Xray-core](https://github.com/XTLS/Xray-core) (официальный релиз v26.9.30, лицензия MPL-2.0, файл `lib/arm64-v8a/libxray.so`), остальные — через sing-box.
 
 
 ## Windows
 
-Готовая сборка: [`apk/Dash-Windows-1.4.1.zip`](apk/Dash-Windows-1.4.1.zip) — распакуйте и запустите `Dash.exe` (нужны права администратора для VPN-адаптера, Windows 10/11 x64).
+Готовая сборка: [`apk/Dash-Windows-1.4.2.zip`](apk/Dash-Windows-1.4.2.zip) — распакуйте и запустите `Dash.exe` (нужны права администратора для VPN-адаптера, Windows 10/11 x64).
 То же, что на телефоне: одна кнопка, автовыбор сервера, несколько подписок, список серверов с пингом, ручной выбор и отключение серверов, xhttp через Xray, российские сайты напрямую. Весь трафик ПК идёт через TUN-адаптер.
 Исходники — в папке [`windows/`](windows/) (Go + WebView2, ядра sing-box и Xray-core — официальные сборки).
