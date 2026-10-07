@@ -1,0 +1,80 @@
+# Publishes builds to GitHub Releases without keeping binaries in main.
+#
+# How to release: merge the code into main first, then push a branch that is main plus
+#   dist/Dash-<ver>.apk and/or dist/Dash-Windows-<ver>.zip (dist/ is gitignored: git add -f)
+#   version.json with the new "version" (and "code" for Android) of each platform being released.
+# This workflow creates the release android-v<ver> / windows-v<ver>, writes url + sha256
+# into version.json on main and deletes the branch, so the binaries never reach main.
+name: release
+
+on:
+  push:
+    branches-ignore: [main]
+    paths: ['dist/**']
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the branch is main + dist/ + version.json
+        run: |
+          set -euo pipefail
+          other=$(git diff --name-only origin/main...HEAD | grep -v -e '^dist/' -e '^version\.json$' || true)
+          if [ -n "$other" ]; then
+            echo "::error::Branch changes files besides dist/ and version.json; merge code into main first:"
+            echo "$other"
+            exit 1
+          fi
+
+      - name: Publish releases and update version.json on main
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git worktree add /tmp/main origin/main
+          done=""
+          for f in dist/Dash-Windows-*.zip dist/Dash-*.apk; do
+            name=$(basename "$f")
+            case "$name" in
+              Dash-Windows-*.zip) plat=windows; title=Windows; ver=${name#Dash-Windows-}; ver=${ver%.zip} ;;
+              *) plat=android; title=Android; ver=${name#Dash-}; ver=${ver%.apk} ;;
+            esac
+            want=$(jq -r ".$plat.version" version.json)
+            if [ "$ver" != "$want" ]; then
+              echo "::error::$name does not match version.json $plat.version=$want"
+              exit 1
+            fi
+            tag=$plat-v$ver
+            sha=$(sha256sum "$f" | cut -d' ' -f1)
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" "$f" --clobber
+            else
+              gh release create "$tag" "$f" --target main --title "Dash $title $ver" --notes "SHA-256 \`$name\`: \`$sha\`"
+            fi
+            url="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$name"
+            jq --arg p "$plat" --arg u "$url" --arg s "$sha" --argjson src "$(jq ".$plat" version.json)" \
+              '.[$p] = ($src + {url: $u, sha256: $s})' /tmp/main/version.json > /tmp/version.json
+            mv /tmp/version.json /tmp/main/version.json
+            done="$done $title $ver"
+          done
+          [ -n "$done" ] || { echo "::error::no Dash-*.apk or Dash-Windows-*.zip in dist/"; exit 1; }
+          cd /tmp/main
+          if ! git diff --quiet; then
+            git commit -am "Release:$done"
+            git push origin HEAD:main
+          fi
+
+      - name: Delete the upload branch
+        run: git push origin --delete "$GITHUB_REF_NAME"
