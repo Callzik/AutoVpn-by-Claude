@@ -73,6 +73,8 @@ jobs:
           mkdir -p dist
           mv build/Dash.apk "dist/Dash-$VER.apk"
       - name: Publish release and update version.json on main
+        env:
+          DASH_KS_PASS: ${{ secrets.DASH_KS_PASS }}
         run: |
           set -euo pipefail
           f=dist/Dash-$VER.apk
@@ -87,5 +89,7 @@ jobs:
           jq --arg v "$VER" --argjson c "$CODE" --arg u "$url" --arg s "$sha" \
             '.android = (.android + {version: $v, code: $c, url: $u, sha256: $s})' version.json > /tmp/version.json
           mv /tmp/version.json version.json
+          DASH_KS_PASS="$DASH_KS_PASS" scripts/sign-version.sh .
+          [ -f version.json.sig ] && git add version.json.sig
           git commit -qam "Release: Android $VER"
           git push origin HEAD:main

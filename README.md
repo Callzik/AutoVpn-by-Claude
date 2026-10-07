@@ -10,7 +10,7 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 
 `helper/main.go` goes into `cmd/sbhelper` of sing-box 1.12 and is built for android/arm64; the binary is packaged as `lib/arm64-v8a/libsbhelper.so`. `build.sh` builds the APK without Gradle (aapt2, javac, dx, apksigner). Releases contain the signed APK.
 
-Windows auto-update accepts `version.json` only with a valid ed25519 signature in `version.json.sig`; the public key is built into Dash.exe (`windows/updatekey.go`). Once: `cd windows && go run ./tools/signversion keygen` (the private key goes to `dash-sign.key` next to the repo; back it up, never commit it). The key stays on the developer machine, not in CI: after every change of `version.json` (including the release commit CI makes), `git pull`, then `go run ./tools/signversion sign` and commit `version.json.sig`. Until then Windows clients ignore the new version.
+Windows auto-update accepts `version.json` only with a valid ed25519 signature in `version.json.sig`; the public key is built into Dash.exe (`windows/updatekey.go`). The private key is created once by the `update-key` workflow inside CI and kept only encrypted in `keystore/update-sign.key.enc` (AES-256, password = the `DASH_KS_PASS` secret). Both release workflows re-sign `version.json` automatically (`scripts/sign-version.sh`).
 
 ## Build
 

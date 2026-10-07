@@ -1,0 +1,44 @@
+# One-time: creates the ed25519 key that signs version.json for the Windows updater.
+# The key is generated inside CI and stored only encrypted (keystore/update-sign.key.enc, AES-256 with the
+# DASH_KS_PASS secret, same as the APK key); the public half goes into windows/updatekey.go.
+name: update-key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  keygen:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load pinned versions
+        run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Generate and encrypt
+        env:
+          DASH_KS_PASS: ${{ secrets.DASH_KS_PASS }}
+        run: |
+          set -euo pipefail
+          [ -n "$DASH_KS_PASS" ] || { echo "::error::secret DASH_KS_PASS is not set"; exit 1; }
+          if [ -f keystore/update-sign.key.enc ]; then
+            echo "::error::keystore/update-sign.key.enc already exists; a new key would cut off installed Windows builds"
+            exit 1
+          fi
+          (cd windows && go run ./tools/signversion keygen >/dev/null)
+          key="$GITHUB_WORKSPACE/../dash-sign.key"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:DASH_KS_PASS -in "$key" -out keystore/update-sign.key.enc
+          shred -u "$key"
+          (cd windows && DASH_SIGN_KEY=$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_KS_PASS -in ../keystore/update-sign.key.enc) go run ./tools/signversion sign)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add keystore/update-sign.key.enc windows/updatekey.go version.json.sig
+          git commit -qm "Windows update signing key (encrypted), signed version.json"
+          git push origin HEAD:main
