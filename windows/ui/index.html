@@ -14,6 +14,7 @@
 html,body{height:100%;background:var(--bg);color:var(--fg);font:15px/1.4 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;overflow:hidden}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 input{font:inherit}
+#stars{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
 .view{position:absolute;inset:0;display:none;flex-direction:column;padding:18px 18px 16px;overflow:hidden}
 .view.on{display:flex}
 .top{display:flex;align-items:center;gap:10px;min-height:40px}
@@ -42,7 +43,7 @@ h1{font-size:21px;font-weight:700;flex:1}
 .word{font-size:22px;font-weight:700;letter-spacing:-.4px}
 .ibtn{width:40px;height:40px;border-radius:13px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
 .ibtn:hover{border-color:var(--line2)}
-.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:11px 14px}
 .tile .v{font-family:Consolas,"Cascadia Mono",monospace;font-size:20px;font-weight:700;margin-top:2px}
 .tile .v.t{font-family:inherit;font-size:18px}
@@ -98,6 +99,7 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
 <body>
 
 <!-- main -->
+<canvas id="stars"></canvas>
 <section class="view" id="v-main">
   <div class="top">
     <div class="brand"><svg width="28" height="28" viewBox="0 0 180 180"><defs><linearGradient id="lt" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#8B7CFF" stop-opacity="0"/><stop offset="1" stop-color="#8B7CFF" stop-opacity=".9"/></linearGradient><radialGradient id="lg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#8B7CFF" stop-opacity=".55"/><stop offset="1" stop-color="#8B7CFF" stop-opacity="0"/></radialGradient><radialGradient id="lb" cx=".38" cy=".36" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#8B7CFF"/><stop offset="1" stop-color="#4B3BC9"/></radialGradient></defs><rect width="180" height="180" rx="42" fill="#17151F"/><path d="M26 150 L106 70 L120 84 Z" fill="url(#lt)"/><path d="M44 154 L110 88 L116 94 Z" fill="url(#lt)" opacity=".6"/><circle cx="120" cy="62" r="44" fill="url(#lg)"/><circle cx="120" cy="62" r="24" fill="url(#lb)"/></svg><span class="word">dash</span><span class="m" id="ver" style="font-size:12px"></span></div>
@@ -115,7 +117,6 @@ pre.log{font-family:Consolas,monospace;font-size:12px;color:var(--muted);white-s
   <div id="bannerbox"></div>
   <div class="tiles">
     <div class="tile clickable" title="Проверить пинг текущего сервера" onclick="if(S.state==='on')api('/api/ping-current').then(poll)"><div class="m">Пинг</div><div class="v" id="t-ping">—</div></div>
-    <div class="tile"><div class="m">Живых</div><div class="v" id="t-alive">—</div></div>
     <div class="tile"><div class="m">Режим</div><div class="v t" id="t-mode">Авто</div></div>
   </div>
   <div class="card clickable row" onclick="show('servers')" style="padding:15px 14px 15px 16px">
@@ -227,7 +228,6 @@ async function poll(){
   else{$('srvname').textContent=manual?S.pinned:'Автовыбор сервера';$('srvsub').textContent=manual?'Выбран вручную':'Самый быстрый из доступных'}
   const tp=$('t-ping');tp.textContent=st!=='on'?'—':S.pingingCurrent?'…':S.ping>0?S.ping:'—';
   tp.className='v '+(st==='on'&&!S.pingingCurrent&&S.ping>0?pc(S.ping):'');
-  $('t-alive').textContent=st!=='off'&&S.alive>0?S.alive:'—';
   $('t-mode').textContent=manual?'Вручную':'Авто';
   orbitState(st);
   if(view==='servers')loadServers();
@@ -295,6 +295,19 @@ async function addSub(id,onb){
 async function pasteInto(id){try{$(id).value=(await navigator.clipboard.readText()).trim()}catch(e){toast('Нажмите Ctrl+V в поле');$(id).focus()}}
 async function copyLog(){try{await navigator.clipboard.writeText($('log').textContent);toast('Журнал скопирован')}catch(e){toast('Не удалось скопировать')}}
 
+/* star background */
+const SF={st:[],w:0,h:0};
+function starsBuild(){const cv=$('stars'),d=devicePixelRatio||1;SF.w=innerWidth;SF.h=innerHeight;cv.width=SF.w*d;cv.height=SF.h*d;
+  let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const n=Math.max(40,Math.round(SF.w*SF.h/1800));SF.st=[];
+  for(let i=0;i<n;i++){const s=rnd();SF.st.push({x:rnd()*SF.w,y:rnd()*SF.h,r:.5+s*s*1.1,a:.12+rnd()*.45,ph:rnd()*6.283,tw:rnd()<.25,tint:rnd()<.2})}}
+function starsFrame(){const cv=$('stars'),c=cv.getContext('2d'),d=devicePixelRatio||1,t=performance.now()/1000;
+  if(SF.w!==innerWidth||SF.h!==innerHeight)starsBuild();
+  c.setTransform(d,0,0,d,0,0);c.clearRect(0,0,SF.w,SF.h);
+  for(const s of SF.st){const a=s.tw?s.a*(.45+.55*(.5+.5*Math.sin(t*.9+s.ph))):s.a;
+    c.fillStyle=s.tint?`rgba(196,188,255,${a})`:`rgba(255,255,255,${a})`;c.beginPath();c.arc(s.x,s.y,s.r,0,7);c.fill()}
+  setTimeout(()=>requestAnimationFrame(starsFrame),66)}
+starsBuild();starsFrame();
 /* orbit comet */
 const OB={st:'off',angle:-90,tail:0,last:0,burst:-1,raf:0};
 function orbitState(st){if(st===OB.st)return;if(st==='on'&&OB.st==='connecting')OB.burst=performance.now();OB.st=st;if(!OB.raf)OB.raf=requestAnimationFrame(orbitFrame)}

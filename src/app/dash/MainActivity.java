@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
         root = new FrameLayout(this);
         root.setBackgroundColor(Ui.BG);
         setContentView(root);
+        root.addView(new StarField(this));
         mainView = buildMain();
         onboardingView = buildOnboarding();
         root.addView(mainView);
@@ -173,7 +174,6 @@ public class MainActivity extends Activity {
                 if (s != null && AppState.vpn == AppState.ON) s.pingCurrent();
             }
         });
-        srvBadge = tile(tiles, "Живых", true);
         wlBadge = tile(tiles, "Белые списки", false);
         col.addView(tiles, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
 
@@ -286,9 +286,6 @@ public class MainActivity extends Activity {
         pingBtn.setText(!on ? "—" : AppState.pingingCurrent ? "…" : AppState.ping > 0 ? String.valueOf(AppState.ping) : "—");
         pingBtn.setTextColor(!on || AppState.pingingCurrent || AppState.ping <= 0 ? Ui.FG
                 : AppState.ping < 150 ? Ui.ACCENT : AppState.ping < 400 ? Ui.WARN : Ui.BAD);
-
-        // tile: alive servers
-        srvBadge.setText(s != AppState.OFF && AppState.alive > 0 ? String.valueOf(AppState.alive) : "—");
 
         // tile: white lists
         int wlColor = Ui.FG;

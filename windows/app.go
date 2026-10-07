@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-const Version = "1.4.2"
+const Version = "1.4.3"
 
 //go:embed assets/rules/*.srs
 var rulesFS embed.FS
