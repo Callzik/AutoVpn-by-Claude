@@ -1,0 +1,3 @@
+# signed byte-for-byte: no line-ending conversion
+version.json -text
+version.json.sig -text
