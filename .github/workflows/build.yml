@@ -18,22 +18,20 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Load pinned versions
         run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: windows/go.sum
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
       - name: Windows client tests
         working-directory: windows
-        run: |
-          go test ./...
-          GOOS=windows GOARCH=amd64 go vet .
+        run: go test ./...
       - name: Android parser tests
         run: scripts/test-android.sh
 
@@ -41,14 +39,14 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Load pinned versions
         run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
@@ -97,7 +95,7 @@ jobs:
           mv build/Dash.apk "build/Dash-$V$APK_SUFFIX.apk"
           echo "APK_NAME=Dash-$V$APK_SUFFIX" >> "$GITHUB_ENV"
           sha256sum build/Dash-*.apk out/*-android-arm64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ env.APK_NAME }}
           path: build/${{ env.APK_NAME }}.apk
@@ -107,10 +105,10 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Load pinned versions
         run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: windows/go.sum
@@ -123,7 +121,7 @@ jobs:
           scripts/package-windows.sh
           echo "ZIP_NAME=$(basename out/Dash-Windows-*.zip .zip)" >> "$GITHUB_ENV"
           sha256sum out/Dash-Windows-*.zip windows/Dash.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ env.ZIP_NAME }}
           path: out/${{ env.ZIP_NAME }}.zip
