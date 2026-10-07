@@ -1,0 +1,133 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load pinned versions
+        run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: windows/go.sum
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Windows client tests
+        working-directory: windows
+        run: go test ./...
+      - name: Android parser tests
+        run: scripts/test-android.sh
+
+  android:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load pinned versions
+        run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Android SDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "build-tools;$ANDROID_BUILD_TOOLS" "platforms;android-$ANDROID_PLATFORM" > /dev/null
+          BT=$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS
+          mkdir -p tools
+          ln -s "$BT/aapt2" tools/aapt2
+          ln -s "$BT/lib/dx.jar" tools/dx.jar
+          ln -s "$BT/lib/apksigner.jar" tools/apksigner.jar
+          echo "TOOLS=$PWD/tools" >> "$GITHUB_ENV"
+          echo "ANDROID_JAR=$ANDROID_HOME/platforms/android-$ANDROID_PLATFORM/android.jar" >> "$GITHUB_ENV"
+      - name: Cores
+        run: |
+          scripts/fetch-cores.sh android
+          echo "CORES_DIR=$PWD/out" >> "$GITHUB_ENV"
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.DASH_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.DASH_KS_PASS }}
+          KS_ALIAS: ${{ secrets.DASH_KS_ALIAS }}
+        run: |
+          KS=$RUNNER_TEMP/dash.keystore
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$KS"
+            echo "DASH_KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
+            echo "DASH_KS_ALIAS=${KS_ALIAS:-dash}" >> "$GITHUB_ENV"
+            echo "APK_SUFFIX=" >> "$GITHUB_ENV"
+          else
+            # no release key in this repo's secrets: throwaway key, the APK is for testing only
+            P=$(openssl rand -hex 16)
+            echo "::add-mask::$P"
+            keytool -genkeypair -keystore "$KS" -storepass "$P" -keypass "$P" -alias dash \
+              -keyalg RSA -keysize 2048 -validity 1 -dname "CN=Dash CI test" > /dev/null 2>&1
+            echo "DASH_KS_PASS=$P" >> "$GITHUB_ENV"
+            echo "DASH_KS_ALIAS=dash" >> "$GITHUB_ENV"
+            echo "APK_SUFFIX=-test-key" >> "$GITHUB_ENV"
+          fi
+          echo "DASH_KS=$KS" >> "$GITHUB_ENV"
+      - name: Build APK
+        run: |
+          ./build.sh
+          V=$(sed -n 's/.*--version-name \([^ ]*\).*/\1/p' build.sh)
+          mv build/Dash.apk "build/Dash-$V$APK_SUFFIX.apk"
+          echo "APK_NAME=Dash-$V$APK_SUFFIX" >> "$GITHUB_ENV"
+          sha256sum build/Dash-*.apk out/*-android-arm64
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ env.APK_NAME }}
+          path: build/${{ env.APK_NAME }}.apk
+          if-no-files-found: error
+
+  windows:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load pinned versions
+        run: grep -E '^[A-Z0-9_]+=' versions.env >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: windows/go.sum
+      - name: rsrc
+        run: go install "github.com/akavel/rsrc@$RSRC_VERSION"
+      - name: Cores
+        run: scripts/fetch-cores.sh windows
+      - name: Build and pack
+        run: |
+          if ! grep -q 'updatePubKey = "[A-Za-z0-9+/=]\{44\}"' windows/updatekey.go; then
+            echo "::warning::windows/updatekey.go has no update key: test build, its auto-update accepts nothing"
+            export DASH_NO_UPDATE_KEY=1 SUFFIX=-no-update-key
+          fi
+          scripts/package-windows.sh
+          echo "ZIP_NAME=$(basename out/Dash-Windows-*.zip .zip)${SUFFIX:-}" >> "$GITHUB_ENV"
+          [ -z "${SUFFIX:-}" ] || mv out/Dash-Windows-*.zip "out/$(basename out/Dash-Windows-*.zip .zip)$SUFFIX.zip"
+          sha256sum out/Dash-Windows-*.zip windows/Dash.exe
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: out/${{ env.ZIP_NAME }}.zip
+          if-no-files-found: error

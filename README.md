@@ -12,6 +12,15 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 
 Windows auto-update accepts `version.json` only with a valid ed25519 signature in `version.json.sig`; the public key is built into Dash.exe (`windows/updatekey.go`). Once: `cd windows && go run ./tools/signversion keygen` (the private key goes to `dash-sign.key` next to the repo; back it up, never commit it). The key stays on the developer machine, not in CI: after every change of `version.json` (including the release commit CI makes), `git pull`, then `go run ./tools/signversion sign` and commit `version.json.sig`. Until then Windows clients ignore the new version.
 
+## Build
+
+Versions of the cores and the toolchain are pinned in [`versions.env`](versions.env); [`.github/workflows/build.yml`](.github/workflows/build.yml) runs the tests and builds the APK and the Windows zip on every push (artifacts of the run).
+
+- `scripts/fetch-cores.sh android` builds sbhelper and fetches Xray into `out/`, then `TOOLS=<dir with aapt2, dx.jar, apksigner.jar> ANDROID_JAR=… CORES_DIR=out ./build.sh` (signing key: `DASH_KS`, `DASH_KS_PASS`).
+- `scripts/fetch-cores.sh windows && scripts/package-windows.sh` gives `out/Dash-Windows-<version>.zip`.
+- Tests: `scripts/test-android.sh` and `cd windows && go test ./...` both run [`testdata/sub-cases.json`](testdata/sub-cases.json), so the two subscription parsers stay in sync.
+- CI signs the APK with the release key from the `DASH_KEYSTORE_B64` / `DASH_KS_PASS` / `DASH_KS_ALIAS` secrets; without them it uses a throwaway key (`-test-key` APK, won't install over a release).
+
 ## О проекте
 
 Проект создан с помощью Claude (Anthropic), ИИ-ассистента: код, сборка и отладка выполнены в диалоге с ним.
