@@ -25,6 +25,14 @@ public class SettingsActivity extends Activity {
     private TextView modeWl, modeNet, modeHint, logView, appsCount;
     private EditText subInput;
     private LinearLayout subList;
+    private TextView updStatus, updBtn;
+    private final android.os.Handler updHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable updTicker = new Runnable() {
+        @Override public void run() {
+            renderUpdate();
+            updHandler.postDelayed(this, 1000);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle b) {
@@ -190,6 +198,26 @@ public class SettingsActivity extends Activity {
         srv.addView(Ui.text(c, serversText(), 13, Ui.FG, false));
         col.addView(srv, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
 
+        // Update
+        col.addView(section(c, "Обновление"));
+        LinearLayout updCard = Ui.card(c);
+        updStatus = Ui.text(c, "", 13, Ui.MUTED, false);
+        updCard.addView(updStatus);
+        updBtn = Ui.button(c, "Проверить обновление", false);
+        updBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (Updater.progress >= 0) return;
+                if (!Updater.newVersion.isEmpty()) {
+                    Updater.start(SettingsActivity.this);
+                } else {
+                    Toast.makeText(SettingsActivity.this, "Проверка обновлений…", Toast.LENGTH_SHORT).show();
+                    Updater.check(SettingsActivity.this, true);
+                }
+            }
+        });
+        updCard.addView(updBtn, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
+        col.addView(updCard, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+
         // Log
         col.addView(section(c, "Журнал"));
         LinearLayout lg = Ui.card(c);
@@ -214,6 +242,29 @@ public class SettingsActivity extends Activity {
         super.onResume();
         int n = prefs.excludedApps().size();
         if (appsCount != null) appsCount.setText(n == 0 ? "Все приложения идут через VPN" : "Напрямую: " + n);
+        updHandler.post(updTicker);
+    }
+
+    @Override protected void onPause() {
+        updHandler.removeCallbacks(updTicker);
+        super.onPause();
+    }
+
+    private void renderUpdate() {
+        if (updStatus == null) return;
+        int pr = Updater.progress;
+        if (pr == 101) updStatus.setText("Установка " + Updater.newVersion + "…");
+        else if (pr >= 0) updStatus.setText("Загрузка " + Updater.newVersion + " · " + pr + "%");
+        else if (!Updater.error.isEmpty()) updStatus.setText(Updater.error);
+        else if (!Updater.newVersion.isEmpty()) updStatus.setText("Доступна версия " + Updater.newVersion);
+        else updStatus.setText("У вас последняя версия " + verName());
+        updBtn.setEnabled(pr < 0);
+        updBtn.setText(pr >= 0 ? "Проверить обновление"
+                : !Updater.newVersion.isEmpty() ? "Установить " + Updater.newVersion : "Проверить обновление");
+    }
+
+    private String verName() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return ""; }
     }
 
     private String logText() {

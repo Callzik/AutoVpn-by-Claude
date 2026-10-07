@@ -114,4 +114,8 @@ public final class Prefs {
 
     public boolean askedNotifications() { return p.getBoolean("asked_notif", false); }
     public void askedNotifications(boolean v) { p.edit().putBoolean("asked_notif", v).apply(); }
+
+    /** versionCode of the build whose "что нового" the user has already seen, 0 = never shown. */
+    public int lastSeenVersion() { return p.getInt("last_seen_version", 0); }
+    public void lastSeenVersion(int v) { p.edit().putInt("last_seen_version", v).apply(); }
 }

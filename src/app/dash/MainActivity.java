@@ -68,8 +68,41 @@ public class MainActivity extends Activity {
         root.addView(onboardingView);
         showScreen();
         askNotifications();
+        showChangelog();
         VpnControl.init(this);
         handleIntent(getIntent());
+    }
+
+    /** "Что нового" after an update — skipped on the very first install. */
+    private void showChangelog() {
+        int code;
+        boolean fresh;
+        try {
+            android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            code = pi.versionCode;
+            fresh = pi.firstInstallTime == pi.lastUpdateTime;
+        } catch (Exception e) {
+            return;
+        }
+        int seen = prefs.lastSeenVersion();
+        if (seen == 0) {
+            if (fresh) { // first install: nothing to tell
+                prefs.lastSeenVersion(code);
+                return;
+            }
+            seen = code - 1; // updated from a build that did not remember versions yet
+        }
+        if (seen >= code) return;
+        java.util.List<String> lines = Changelog.since(seen, code);
+        prefs.lastSeenVersion(code);
+        if (lines.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        for (String l : lines) sb.append("•  ").append(l).append("\n\n");
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Что нового")
+                .setMessage(sb.toString().trim())
+                .setPositiveButton("Понятно", null)
+                .show();
     }
 
     @Override protected void onNewIntent(Intent intent) {
