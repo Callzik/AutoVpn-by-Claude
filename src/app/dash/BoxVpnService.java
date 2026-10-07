@@ -216,9 +216,22 @@ public class BoxVpnService extends VpnService {
         // Subscriptions
         List<String> urls = prefs.subUrls();
         if (urls.isEmpty()) throw new Exception("Добавьте ссылку на подписку");
-        AppState.phase = urls.size() > 1 ? "Загрузка подписок (" + urls.size() + ")" : "Загрузка подписки";
-        AppState.changed();
-        List<Subs.Entry> entries = loadSubs(urls);
+        // White lists are checked while the subscription loads: both only wait for the network
+        registerNetwork();
+        Thread wl = new Thread(new Runnable() {
+            @Override public void run() { probeWl(); }
+        }, "wl-probe");
+        wl.start();
+        List<Subs.Entry> entries = savedSubs(urls);
+        final boolean fromCache = entries != null;
+        if (fromCache) {
+            AppState.log("Подписка обновлялась " + (System.currentTimeMillis() - prefs.subUpdated()) / 60000
+                    + " мин назад — используется сохранённая копия, обновление в фоне");
+        } else {
+            AppState.phase = urls.size() > 1 ? "Загрузка подписок (" + urls.size() + ")" : "Загрузка подписки";
+            AppState.changed();
+            entries = loadSubs(urls);
+        }
         if (!running) return;
         List<String> warnings = new ArrayList<>();
         List<String> stubs = new ArrayList<>();
@@ -231,15 +244,15 @@ public class BoxVpnService extends VpnService {
             if (!stubs.isEmpty()) throw new Exception("Сервис подписки вместо серверов прислал заглушку: " + stubs.get(0));
             throw new Exception("Не удалось скачать подписку. Проверьте ссылку и интернет");
         }
-        prefs.markSubUpdated();
+        if (!fromCache) prefs.markSubUpdated();
         applyServers(merged, warnings);
         if (!running) return;
 
-        // Network + white lists
-        registerNetwork();
-        AppState.phase = "Проверка белых списков";
-        AppState.changed();
-        probeWl();
+        if (wl.isAlive()) {
+            AppState.phase = "Проверка белых списков";
+            AppState.changed();
+            wl.join();
+        }
         if (!running) return;
 
         startServer();
@@ -250,7 +263,35 @@ public class BoxVpnService extends VpnService {
             subTask = exec.scheduleWithFixedDelay(new Runnable() {
                 @Override public void run() { safeCheckSub(); }
             }, SUB_CHECK_EVERY_MIN, SUB_CHECK_EVERY_MIN, TimeUnit.MINUTES);
+            if (fromCache && AppState.vpn == AppState.WAITING && AppState.wl != AppState.WL_NONET) {
+                // the saved servers do not answer: maybe the subscription changed, download it now
+                AppState.log("Серверы из сохранённой подписки не отвечают — загрузка свежей");
+                prefs.resetSubUpdated();
+                exec.execute(new Runnable() {
+                    @Override public void run() { safeCheckSub(); }
+                });
+            }
         }
+    }
+
+    /**
+     * Saved copies of all subscriptions when they were downloaded less than SUB_REFRESH_MS ago, else null.
+     * Connecting then does not wait for the download; the periodic check refreshes them.
+     * Adding, removing or manually refreshing a subscription resets the time, so those always download.
+     */
+    private List<Subs.Entry> savedSubs(List<String> urls) {
+        long age = System.currentTimeMillis() - prefs.subUpdated();
+        if (age < 0 || age >= SUB_REFRESH_MS) return null;
+        List<Subs.Entry> out = new ArrayList<>();
+        for (String url : urls) {
+            Subs.Entry e = new Subs.Entry();
+            e.url = url;
+            e.name = Subs.label(prefs, url);
+            e.body = Subs.isHttp(url) ? prefs.subCache(url) : url;
+            if (e.body.isEmpty()) return null;
+            out.add(e);
+        }
+        return out;
     }
 
     private static boolean isHttp(String url) {
@@ -393,7 +434,7 @@ public class BoxVpnService extends VpnService {
                 // keep waiting
             }
             if (System.currentTimeMillis() > deadline) throw new Exception("Ядро не отвечает");
-            Thread.sleep(300);
+            Thread.sleep(100);
         }
         if (!running) return;
 
@@ -467,6 +508,10 @@ public class BoxVpnService extends VpnService {
             deadCount = 0;
             AppState.ping = d;
             AppState.changed();
+            if (d >= SLOW_MS && System.currentTimeMillis() - lastFasterCheck > FASTER_CHECK_EVERY_MS) {
+                lastFasterCheck = System.currentTimeMillis();
+                preferFaster(group, clash.testGroup(group, 5000));
+            }
             return;
         }
         deadCount++;
@@ -495,6 +540,38 @@ public class BoxVpnService extends VpnService {
             Server n = byTag.get(now);
             AppState.banner("Сервер перестал отвечать — переключено на " + (n != null ? n.name : now), 2);
         }
+    }
+
+    /* ---------- automatic choice: move to a clearly faster server ---------- */
+
+    private static final int SLOW_MS = 250;
+    private static final long FASTER_CHECK_EVERY_MS = 60000;
+    private long lastFasterCheck;
+
+    /**
+     * The group keeps its server until its own check every few minutes, even when a much faster one answers.
+     * When the fresh results show one at least 150 ms and 1.5 times faster, the group re-tests and re-selects now.
+     * Open connections stay where they are; new ones go through the new server.
+     */
+    private void preferFaster(String group, Map<String, Integer> res) throws Exception {
+        if (!running || clash == null || res.isEmpty() || pinnedTag() != null || !group.equals(activeGroup)) return;
+        String cur = clash.now(group);
+        Integer cd = res.get(cur);
+        String bestTag = null;
+        int best = Integer.MAX_VALUE;
+        for (Map.Entry<String, Integer> e : res.entrySet()) {
+            if (e.getValue() < best) {
+                best = e.getValue();
+                bestTag = e.getKey();
+            }
+        }
+        if (bestTag == null || bestTag.equals(cur)) return;
+        if (cd != null && (cd - best < 150 || cd * 2 < best * 3)) return;
+        Server cs = byTag.get(cur), bs = byTag.get(bestTag);
+        AppState.log("Есть сервер быстрее: " + (bs != null ? bs.name : bestTag) + " " + best + " мс, сейчас "
+                + (cs != null ? cs.name : cur) + " " + (cd != null ? cd + " мс" : "без ответа") + " — перепроверка");
+        clash.groupCheck(group, 5000);
+        refreshStatus();
     }
 
     /* ---------- manual server choice ---------- */
@@ -729,7 +806,7 @@ public class BoxVpnService extends VpnService {
 
     /** Tests the group, falls back to the other group. Returns the group in use or null. */
     private String ensureWorkingGroup(String group, boolean initial) throws Exception {
-        Map<String, Integer> res = clash.testGroup(group, 5000);
+        Map<String, Integer> res = initial ? quickTest(group) : clash.testGroup(group, 5000);
         AppState.log("Пинг (" + groupLabel(group) + "): отвечают " + res.size() + " из " + countGroup(group));
         String use = group;
         if (res.isEmpty()) {
@@ -757,6 +834,32 @@ public class BoxVpnService extends VpnService {
         AppState.groupSize = countGroup(use);
         return use;
     }
+
+    /** Waits only QUICK_GRACE_MS after the first answer; the full count comes later. */
+    private Map<String, Integer> quickTest(final String group) throws Exception {
+        return clash.testGroup(group, 5000, QUICK_GRACE_MS, new Clash.Done() {
+            @Override public void onDone(Map<String, Integer> all) {
+                if (!running || !group.equals(activeGroup)) return;
+                AppState.log("Пинг (" + groupLabel(group) + ") полностью: отвечают " + all.size() + " из " + countGroup(group));
+                AppState.alive = all.size();
+                AppState.changed();
+                final Map<String, Integer> res = all;
+                try {
+                    exec.execute(new Runnable() {
+                        @Override public void run() {
+                            try {
+                                preferFaster(group, res);
+                            } catch (Throwable ignored) {
+                            }
+                        }
+                    });
+                } catch (Exception ignored) {
+                }
+            }
+        });
+    }
+
+    private static final long QUICK_GRACE_MS = 1500;
 
     private int countGroup(String g) {
         int want = ConfigBuilder.GROUP_LTE.equals(g) ? Server.LTE : Server.REGULAR;

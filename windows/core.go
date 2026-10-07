@@ -54,11 +54,12 @@ type Core struct {
 	xrProc  *exec.Cmd
 	xrayCfg string
 
-	activeGroup    string
-	regularBlocked bool
-	lastRegularTry time.Time
-	deadCount      int
-	switching      bool
+	activeGroup     string
+	regularBlocked  bool
+	lastRegularTry  time.Time
+	deadCount       int
+	lastFasterCheck time.Time
+	switching       bool
 
 	serverName, group  string
 	ping, alive, gsize int
@@ -202,12 +203,19 @@ func (c *Core) boot(g int) error {
 	if len(urls) == 0 {
 		return fmt.Errorf("Добавьте ссылку на подписку")
 	}
-	if len(urls) > 1 {
-		c.setPhase(g, fmt.Sprintf("Загрузка подписок (%d)", len(urls)))
+	entries := c.savedSubs(urls)
+	fromCache := entries != nil
+	if fromCache {
+		c.log.Add(fmt.Sprintf("Подписка обновлялась %d мин назад — используется сохранённая копия, обновление в фоне",
+			int(time.Since(time.Unix(c.prefs.Get().SubUpdated, 0)).Minutes())))
 	} else {
-		c.setPhase(g, "Загрузка подписки")
+		if len(urls) > 1 {
+			c.setPhase(g, fmt.Sprintf("Загрузка подписок (%d)", len(urls)))
+		} else {
+			c.setPhase(g, "Загрузка подписки")
+		}
+		entries = c.loadSubs(urls)
 	}
-	entries := c.loadSubs(urls)
 	if !c.current(g) {
 		return nil
 	}
@@ -231,13 +239,46 @@ func (c *Core) boot(g int) error {
 	if usable == 0 {
 		return fmt.Errorf("Нет серверов для подключения: все отключены или не поддерживаются")
 	}
-	c.prefs.MarkUpdated()
+	if !fromCache {
+		c.prefs.MarkUpdated()
+	}
 	c.applyServers(merged, warnings)
 	if err := c.startCore(g); err != nil {
 		return err
 	}
 	go c.loops(g)
+	c.mu.Lock()
+	waiting := c.gen == g && c.state == StWaiting
+	c.mu.Unlock()
+	if fromCache && waiting {
+		// the saved servers do not answer: maybe the subscription changed, download it now
+		c.log.Add("Серверы из сохранённой подписки не отвечают — загрузка свежей")
+		c.prefs.Update(func(d *PrefsData) { d.SubUpdated = 0 })
+		go c.checkSub(g)
+	}
 	return nil
+}
+
+// savedSubs returns the saved copies of all subscriptions when they were downloaded less than subRefresh ago,
+// else nil. Connecting then does not wait for the download; the periodic check refreshes them.
+// Adding, removing or manually refreshing a subscription resets the time, so those always download.
+func (c *Core) savedSubs(urls []string) []SubEntry {
+	age := time.Since(time.Unix(c.prefs.Get().SubUpdated, 0))
+	if age < 0 || age >= subRefresh {
+		return nil
+	}
+	var out []SubEntry
+	for _, u := range urls {
+		body := u
+		if isHTTP(u) {
+			body = c.prefs.Cache(u)
+		}
+		if body == "" {
+			return nil
+		}
+		out = append(out, SubEntry{URL: u, Name: c.prefs.SubLabel(u), Body: body})
+	}
+	return out
 }
 
 /* ---------- subscriptions ---------- */
@@ -589,7 +630,7 @@ func (c *Core) startSingBox(g int, servers []*Server, group string, idx int) (ok
 			killProc(p.cmd)
 			return false, false, fmt.Errorf("ядро не отвечает")
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 	p.mu.Lock()
 	p.starting = false
@@ -713,7 +754,12 @@ func (c *Core) ensureWorkingGroup(g int, group string, initial bool) string {
 	if cl == nil {
 		return ""
 	}
-	res := cl.TestGroup(group, 5000)
+	var res map[string]int
+	if initial {
+		res = c.quickTest(g, cl, group)
+	} else {
+		res = cl.TestGroup(group, 5000)
+	}
 	c.log.Add(fmt.Sprintf("Пинг (%s): отвечают %d из %d", c.groupLabel(group), len(res), c.countGroup(group)))
 	use := group
 	if len(res) == 0 && group == GroupNameRegular {
@@ -751,6 +797,63 @@ func (c *Core) ensureWorkingGroup(g int, group string, initial bool) string {
 	c.activeGroup, c.group, c.alive = use, use, len(res)
 	c.mu.Unlock()
 	return use
+}
+
+// quickTest waits only 1.5 s after the first answer; the full count comes later.
+func (c *Core) quickTest(g int, cl *Clash, group string) map[string]int {
+	return cl.TestGroupQuick(group, 5000, 1500*time.Millisecond, func(all map[string]int) {
+		c.mu.Lock()
+		mine := c.gen == g && c.activeGroup == group
+		if mine {
+			c.alive = len(all)
+		}
+		c.mu.Unlock()
+		if mine {
+			c.log.Add(fmt.Sprintf("Пинг (%s) полностью: отвечают %d из %d", c.groupLabel(group), len(all), c.countGroup(group)))
+			c.preferFaster(g, cl, group, all)
+		}
+	})
+}
+
+const slowMs = 250
+
+// preferFaster: the group keeps its server until its own check every minute or so, even when a much faster
+// one answers. When fresh results show one at least 150 ms and 1.5 times faster, the group re-tests and
+// re-selects now. Open connections stay where they are; new ones go through the new server.
+func (c *Core) preferFaster(g int, cl *Clash, group string, res map[string]int) {
+	c.mu.Lock()
+	ok := c.gen == g && c.state == StOn && c.activeGroup == group
+	c.mu.Unlock()
+	if !ok || len(res) == 0 || c.pinnedTag() != "" {
+		return
+	}
+	cur := cl.Now(group)
+	cd, curOK := res[cur]
+	bestTag, best := "", 0
+	for t, d := range res {
+		if bestTag == "" || d < best {
+			bestTag, best = t, d
+		}
+	}
+	if bestTag == cur || curOK && (cd-best < 150 || cd*2 < best*3) {
+		return
+	}
+	c.mu.Lock()
+	curName, bestName := cur, bestTag
+	if s, ok := c.byTag[cur]; ok {
+		curName = s.Name
+	}
+	if s, ok := c.byTag[bestTag]; ok {
+		bestName = s.Name
+	}
+	c.mu.Unlock()
+	curText := "без ответа"
+	if curOK {
+		curText = fmt.Sprintf("%d мс", cd)
+	}
+	c.log.Add(fmt.Sprintf("Есть сервер быстрее: %s %d мс, сейчас %s %s — перепроверка", bestName, best, curName, curText))
+	cl.GroupCheck(group, 5000)
+	c.refreshStatus()
 }
 
 func (c *Core) scheduleRetry(g int, d time.Duration) {
@@ -960,7 +1063,14 @@ func (c *Core) watch(g int) {
 	if d := cl.Delay(tag, 5000); d > 0 {
 		c.mu.Lock()
 		c.deadCount, c.ping = 0, d
+		check := d >= slowMs && time.Since(c.lastFasterCheck) > time.Minute
+		if check {
+			c.lastFasterCheck = time.Now()
+		}
 		c.mu.Unlock()
+		if check {
+			c.preferFaster(g, cl, group, cl.TestGroup(group, 5000))
+		}
 		return
 	}
 	c.mu.Lock()
