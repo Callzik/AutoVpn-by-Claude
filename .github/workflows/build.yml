@@ -118,8 +118,13 @@ jobs:
         run: scripts/fetch-cores.sh windows
       - name: Build and pack
         run: |
+          if ! grep -q 'updatePubKey = "[A-Za-z0-9+/=]\{44\}"' windows/updatekey.go; then
+            echo "::warning::windows/updatekey.go has no update key: test build, its auto-update accepts nothing"
+            export DASH_NO_UPDATE_KEY=1 SUFFIX=-no-update-key
+          fi
           scripts/package-windows.sh
-          echo "ZIP_NAME=$(basename out/Dash-Windows-*.zip .zip)" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=$(basename out/Dash-Windows-*.zip .zip)${SUFFIX:-}" >> "$GITHUB_ENV"
+          [ -z "${SUFFIX:-}" ] || mv out/Dash-Windows-*.zip "out/$(basename out/Dash-Windows-*.zip .zip)$SUFFIX.zip"
           sha256sum out/Dash-Windows-*.zip windows/Dash.exe
       - uses: actions/upload-artifact@v5
         with:

@@ -2,6 +2,8 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -23,7 +25,8 @@ type Updater struct {
 	dir      string
 	newVer   string
 	url      string
-	progress int // -1 idle, 0..100 downloading, 101 restarting
+	sha      string // lowercase hex SHA-256 of the zip from version.json, empty if not published
+	progress int    // -1 idle, 0..100 downloading, 101 restarting
 	err      string
 	// restart is set by main: stops the VPN, starts the new exe and exits
 	restart func(exe string)
@@ -71,21 +74,43 @@ func newer(a, b string) bool {
 	return false
 }
 
+// getSmall fetches a small text file (version.json and its signature).
+func getSmall(cl *http.Client, url string) ([]byte, error) {
+	resp, err := cl.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+}
+
 func (u *Updater) Check() {
 	cl := &http.Client{Timeout: 20 * time.Second}
-	resp, err := cl.Get(versionURL)
+	body, err := getSmall(cl, versionURL)
 	if err != nil {
 		u.log.Add("Проверка обновлений: нет связи с GitHub")
 		return
 	}
-	defer resp.Body.Close()
+	sig, err := getSmall(cl, versionURL+".sig")
+	if err == nil {
+		err = verifyManifest(body, sig)
+	}
+	if err != nil {
+		// only a manifest signed with the release key may point the updater at a new Dash.exe
+		u.log.Add("Проверка обновлений: подпись не прошла (" + err.Error() + ")")
+		return
+	}
 	var v struct {
 		Windows struct {
 			Version string `json:"version"`
 			URL     string `json:"url"`
+			SHA256  string `json:"sha256"`
 		} `json:"windows"`
 	}
-	if resp.StatusCode != 200 || json.NewDecoder(resp.Body).Decode(&v) != nil || v.Windows.URL == "" {
+	if json.Unmarshal(body, &v) != nil || v.Windows.URL == "" {
 		return
 	}
 	u.mu.Lock()
@@ -94,9 +119,9 @@ func (u *Updater) Check() {
 		if u.newVer != v.Windows.Version {
 			u.log.Add("Доступна версия " + v.Windows.Version)
 		}
-		u.newVer, u.url = v.Windows.Version, v.Windows.URL
+		u.newVer, u.url, u.sha = v.Windows.Version, v.Windows.URL, strings.ToLower(strings.TrimSpace(v.Windows.SHA256))
 	} else {
-		u.newVer, u.url = "", ""
+		u.newVer, u.url, u.sha = "", "", ""
 	}
 }
 
@@ -122,11 +147,11 @@ func (u *Updater) Install() {
 		u.mu.Unlock()
 		return
 	}
-	url, ver := u.url, u.newVer
+	url, sha, ver := u.url, u.sha, u.newVer
 	u.progress, u.err = 0, ""
 	u.mu.Unlock()
 	go func() {
-		exe, err := u.fetch(url)
+		exe, err := u.fetch(url, sha)
 		if err != nil {
 			u.log.Add("Обновление не удалось: " + err.Error())
 			u.mu.Lock()
@@ -144,7 +169,7 @@ func (u *Updater) Install() {
 	}()
 }
 
-func (u *Updater) fetch(url string) (string, error) {
+func (u *Updater) fetch(url, sha string) (string, error) {
 	dir := filepath.Join(u.dir, "update")
 	_ = os.RemoveAll(dir)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -164,10 +189,14 @@ func (u *Updater) fetch(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = io.Copy(io.MultiWriter(f, &progressWriter{u: u, total: resp.ContentLength}), resp.Body)
+	h := sha256.New()
+	_, err = io.Copy(io.MultiWriter(f, h, &progressWriter{u: u, total: resp.ContentLength}), resp.Body)
 	f.Close()
 	if err != nil {
 		return "", errors.New("загрузка прервалась")
+	}
+	if sha != "" && hex.EncodeToString(h.Sum(nil)) != sha {
+		return "", errors.New("SHA-256 архива не совпал")
 	}
 	zr, err := zip.OpenReader(zpath)
 	if err != nil {

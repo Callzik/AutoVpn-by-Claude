@@ -28,6 +28,7 @@ public final class Updater {
     // state for the main screen
     static volatile String newVersion = "";
     static volatile String apkUrl = "";
+    static volatile String apkSha = ""; // lowercase hex SHA-256 from version.json, empty if not published
     static volatile int progress = -1; // -1 idle, 0..100 downloading, 101 installing
     static volatile String error = "";
     private static volatile boolean checking;
@@ -50,6 +51,7 @@ public final class Updater {
         if (newVersion.isEmpty() && sp.getInt("upd_code", 0) > currentCode(c)) {
             newVersion = sp.getString("upd_ver", "");
             apkUrl = sp.getString("upd_url", "");
+            apkSha = sp.getString("upd_sha", "");
         }
         if (checking) return;
         if (!force && System.currentTimeMillis() - sp.getLong("upd_checked", 0) < CHECK_EVERY) return;
@@ -60,11 +62,14 @@ public final class Updater {
                     JSONObject a = new JSONObject(get(VERSION_URL)).getJSONObject("android");
                     int code = a.getInt("code");
                     String ver = a.getString("version"), url = a.getString("url");
+                    String sha = a.optString("sha256", "").trim().toLowerCase(java.util.Locale.ROOT);
                     sp.edit().putLong("upd_checked", System.currentTimeMillis())
-                            .putInt("upd_code", code).putString("upd_ver", ver).putString("upd_url", url).apply();
+                            .putInt("upd_code", code).putString("upd_ver", ver).putString("upd_url", url)
+                            .putString("upd_sha", sha).apply();
                     if (code > currentCode(c)) {
                         newVersion = ver;
                         apkUrl = url;
+                        apkSha = sha;
                     } else {
                         newVersion = "";
                     }
@@ -102,7 +107,7 @@ public final class Updater {
             return;
         }
         final Context c = act.getApplicationContext();
-        final String url = apkUrl;
+        final String url = apkUrl, sha = apkSha;
         progress = 0;
         error = "";
         new Thread(new Runnable() {
@@ -110,6 +115,13 @@ public final class Updater {
                 File f = new File(c.getCacheDir(), "update.apk");
                 try {
                     download(url, f);
+                    if (!sha.isEmpty() && !sha.equals(sha256(f))) {
+                        f.delete();
+                        error = "Файл обновления повреждён";
+                        AppState.log("Обновление: SHA-256 не совпал");
+                        progress = -1;
+                        return;
+                    }
                     progress = 101;
                     install(c, f);
                 } catch (Exception e) {
@@ -140,6 +152,18 @@ public final class Updater {
             h.disconnect();
         }
         if (out.length() < 1_000_000) throw new Exception("файл слишком мал");
+    }
+
+    private static String sha256(File f) throws Exception {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        try (InputStream in = new FileInputStream(f)) {
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+        }
+        StringBuilder b = new StringBuilder();
+        for (byte x : md.digest()) b.append(String.format(java.util.Locale.ROOT, "%02x", x));
+        return b.toString();
     }
 
     private static void install(Context c, File apk) throws Exception {
