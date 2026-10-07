@@ -16,7 +16,7 @@ Android VPN client on the sing-box core. Paste a subscription link, press one bu
 
 ## Скачать
 
-Готовый APK (arm64): [`apk/Dash-1.9.7.apk`](apk/Dash-1.9.7.apk). Разреши установку из неизвестных источников и вставь ссылку подписки.
+Готовый APK (arm64): [`apk/Dash-1.9.8.apk`](apk/Dash-1.9.8.apk). Разреши установку из неизвестных источников и вставь ссылку подписки.
 
 Серверы с транспортом xhttp идут через встроенное ядро [Xray-core](https://github.com/XTLS/Xray-core) (официальный релиз v26.9.30, лицензия MPL-2.0, файл `lib/arm64-v8a/libxray.so`), остальные — через sing-box.
 
