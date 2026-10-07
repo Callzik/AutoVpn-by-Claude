@@ -716,6 +716,16 @@ func (c *Core) ensureWorkingGroup(g int, group string, initial bool) string {
 	res := cl.TestGroup(group, 5000)
 	c.log.Add(fmt.Sprintf("Пинг (%s): отвечают %d из %d", c.groupLabel(group), len(res), c.countGroup(group)))
 	use := group
+	if len(res) == 0 && group == GroupNameRegular {
+		// main servers are preferred: re-check once with a longer timeout before giving up on them
+		// (right after start the adapter may not carry traffic yet, a single slow round is not "dead")
+		time.Sleep(2 * time.Second)
+		if !c.current(g) {
+			return ""
+		}
+		res = cl.TestGroup(group, 8000)
+		c.log.Add(fmt.Sprintf("Повторный пинг (%s): отвечают %d из %d", c.groupLabel(group), len(res), c.countGroup(group)))
+	}
 	if len(res) == 0 {
 		if alt := c.other(group); alt != "" {
 			r2 := cl.TestGroup(alt, 5000)
@@ -792,7 +802,7 @@ func (c *Core) reevaluate(g int, cause string) {
 		return
 	}
 	want := c.desiredGroup()
-	if want != active && blocked && cause == "periodic" && time.Since(lastTry) < 10*time.Minute {
+	if want != active && blocked && cause == "periodic" && time.Since(lastTry) < 90*time.Second {
 		want = active // stay on white-list servers for now
 	}
 	if want == GroupNameRegular && want != active {
