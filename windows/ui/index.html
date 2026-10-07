@@ -306,7 +306,23 @@ function starsFrame(){const cv=$('stars'),c=cv.getContext('2d'),d=devicePixelRat
   c.setTransform(d,0,0,d,0,0);c.clearRect(0,0,SF.w,SF.h);
   for(const s of SF.st){const a=s.tw?s.a*(.45+.55*(.5+.5*Math.sin(t*.9+s.ph))):s.a;
     c.fillStyle=s.tint?`rgba(196,188,255,${a})`:`rgba(255,255,255,${a})`;c.beginPath();c.arc(s.x,s.y,s.r,0,7);c.fill()}
-  setTimeout(()=>requestAnimationFrame(starsFrame),66)}
+  const fly=starsComet(c,performance.now());
+  setTimeout(()=>requestAnimationFrame(starsFrame),fly?0:66)}
+const CM={start:-1,next:performance.now()+3000};
+function starsComet(c,now){
+  if(CM.start<0){if(now<CM.next)return false;
+    CM.start=now;CM.x=(-.1+Math.random()*.6)*SF.w;CM.y=(.45+Math.random()*.5)*SF.h;
+    const a=(-38+(Math.random()-.5)*20)*Math.PI/180;CM.dx=Math.cos(a);CM.dy=Math.sin(a);CM.d=.75*Math.max(SF.w,SF.h)}
+  const t=(now-CM.start)/1400;
+  if(t>=1){CM.start=-1;CM.next=now+7000+Math.random()*9000;return false}
+  const e=1-(1-t)*(1-t),f=t<.15?t/.15:t>.7?(1-t)/.3:1;
+  const hx=CM.x+CM.dx*CM.d*e,hy=CM.y+CM.dy*CM.d*e,len=120*(.4+.6*f),tx=hx-CM.dx*len,ty=hy-CM.dy*len;
+  const g=c.createLinearGradient(tx,ty,hx,hy);g.addColorStop(0,'rgba(139,124,255,0)');g.addColorStop(1,`rgba(139,124,255,${.85*f})`);
+  c.strokeStyle=g;c.lineWidth=2;c.lineCap='round';c.beginPath();c.moveTo(tx,ty);c.lineTo(hx,hy);c.stroke();
+  const h=c.createRadialGradient(hx,hy,0,hx,hy,9);h.addColorStop(0,`rgba(139,124,255,${.5*f})`);h.addColorStop(1,'rgba(139,124,255,0)');
+  c.fillStyle=h;c.beginPath();c.arc(hx,hy,9,0,7);c.fill();
+  c.fillStyle=`rgba(230,225,255,${f})`;c.beginPath();c.arc(hx,hy,2.2,0,7);c.fill();
+  return true}
 starsBuild();starsFrame();
 /* orbit comet */
 const OB={st:'off',angle:-90,tail:0,last:0,burst:-1,raf:0};
