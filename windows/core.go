@@ -54,11 +54,12 @@ type Core struct {
 	xrProc  *exec.Cmd
 	xrayCfg string
 
-	activeGroup    string
-	regularBlocked bool
-	lastRegularTry time.Time
-	deadCount      int
-	switching      bool
+	activeGroup     string
+	regularBlocked  bool
+	lastRegularTry  time.Time
+	deadCount       int
+	lastFasterCheck time.Time
+	switching       bool
 
 	serverName, group  string
 	ping, alive, gsize int
@@ -809,8 +810,50 @@ func (c *Core) quickTest(g int, cl *Clash, group string) map[string]int {
 		c.mu.Unlock()
 		if mine {
 			c.log.Add(fmt.Sprintf("Пинг (%s) полностью: отвечают %d из %d", c.groupLabel(group), len(all), c.countGroup(group)))
+			c.preferFaster(g, cl, group, all)
 		}
 	})
+}
+
+const slowMs = 250
+
+// preferFaster: the group keeps its server until its own check every minute or so, even when a much faster
+// one answers. When fresh results show one at least 150 ms and 1.5 times faster, the group re-tests and
+// re-selects now. Open connections stay where they are; new ones go through the new server.
+func (c *Core) preferFaster(g int, cl *Clash, group string, res map[string]int) {
+	c.mu.Lock()
+	ok := c.gen == g && c.state == StOn && c.activeGroup == group
+	c.mu.Unlock()
+	if !ok || len(res) == 0 || c.pinnedTag() != "" {
+		return
+	}
+	cur := cl.Now(group)
+	cd, curOK := res[cur]
+	bestTag, best := "", 0
+	for t, d := range res {
+		if bestTag == "" || d < best {
+			bestTag, best = t, d
+		}
+	}
+	if bestTag == cur || curOK && (cd-best < 150 || cd*2 < best*3) {
+		return
+	}
+	c.mu.Lock()
+	curName, bestName := cur, bestTag
+	if s, ok := c.byTag[cur]; ok {
+		curName = s.Name
+	}
+	if s, ok := c.byTag[bestTag]; ok {
+		bestName = s.Name
+	}
+	c.mu.Unlock()
+	curText := "без ответа"
+	if curOK {
+		curText = fmt.Sprintf("%d мс", cd)
+	}
+	c.log.Add(fmt.Sprintf("Есть сервер быстрее: %s %d мс, сейчас %s %s — перепроверка", bestName, best, curName, curText))
+	cl.GroupCheck(group, 5000)
+	c.refreshStatus()
 }
 
 func (c *Core) scheduleRetry(g int, d time.Duration) {
@@ -1020,7 +1063,14 @@ func (c *Core) watch(g int) {
 	if d := cl.Delay(tag, 5000); d > 0 {
 		c.mu.Lock()
 		c.deadCount, c.ping = 0, d
+		check := d >= slowMs && time.Since(c.lastFasterCheck) > time.Minute
+		if check {
+			c.lastFasterCheck = time.Now()
+		}
 		c.mu.Unlock()
+		if check {
+			c.preferFaster(g, cl, group, cl.TestGroup(group, 5000))
+		}
 		return
 	}
 	c.mu.Lock()

@@ -157,7 +157,7 @@ func BuildSingBox(servers []*Server, opt BuildOptions) (string, error) {
 }
 
 func urltest(tag string, members []any) obj {
-	return obj{"type": "urltest", "tag": tag, "outbounds": members, "url": TestURL, "interval": "3m",
+	return obj{"type": "urltest", "tag": tag, "outbounds": members, "url": TestURL, "interval": "1m",
 		"tolerance": 100, "interrupt_exist_connections": false}
 }
 

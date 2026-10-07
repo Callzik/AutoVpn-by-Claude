@@ -508,6 +508,10 @@ public class BoxVpnService extends VpnService {
             deadCount = 0;
             AppState.ping = d;
             AppState.changed();
+            if (d >= SLOW_MS && System.currentTimeMillis() - lastFasterCheck > FASTER_CHECK_EVERY_MS) {
+                lastFasterCheck = System.currentTimeMillis();
+                preferFaster(group, clash.testGroup(group, 5000));
+            }
             return;
         }
         deadCount++;
@@ -536,6 +540,38 @@ public class BoxVpnService extends VpnService {
             Server n = byTag.get(now);
             AppState.banner("Сервер перестал отвечать — переключено на " + (n != null ? n.name : now), 2);
         }
+    }
+
+    /* ---------- automatic choice: move to a clearly faster server ---------- */
+
+    private static final int SLOW_MS = 250;
+    private static final long FASTER_CHECK_EVERY_MS = 60000;
+    private long lastFasterCheck;
+
+    /**
+     * The group keeps its server until its own check every few minutes, even when a much faster one answers.
+     * When the fresh results show one at least 150 ms and 1.5 times faster, the group re-tests and re-selects now.
+     * Open connections stay where they are; new ones go through the new server.
+     */
+    private void preferFaster(String group, Map<String, Integer> res) throws Exception {
+        if (!running || clash == null || res.isEmpty() || pinnedTag() != null || !group.equals(activeGroup)) return;
+        String cur = clash.now(group);
+        Integer cd = res.get(cur);
+        String bestTag = null;
+        int best = Integer.MAX_VALUE;
+        for (Map.Entry<String, Integer> e : res.entrySet()) {
+            if (e.getValue() < best) {
+                best = e.getValue();
+                bestTag = e.getKey();
+            }
+        }
+        if (bestTag == null || bestTag.equals(cur)) return;
+        if (cd != null && (cd - best < 150 || cd * 2 < best * 3)) return;
+        Server cs = byTag.get(cur), bs = byTag.get(bestTag);
+        AppState.log("Есть сервер быстрее: " + (bs != null ? bs.name : bestTag) + " " + best + " мс, сейчас "
+                + (cs != null ? cs.name : cur) + " " + (cd != null ? cd + " мс" : "без ответа") + " — перепроверка");
+        clash.groupCheck(group, 5000);
+        refreshStatus();
     }
 
     /* ---------- manual server choice ---------- */
@@ -807,6 +843,18 @@ public class BoxVpnService extends VpnService {
                 AppState.log("Пинг (" + groupLabel(group) + ") полностью: отвечают " + all.size() + " из " + countGroup(group));
                 AppState.alive = all.size();
                 AppState.changed();
+                final Map<String, Integer> res = all;
+                try {
+                    exec.execute(new Runnable() {
+                        @Override public void run() {
+                            try {
+                                preferFaster(group, res);
+                            } catch (Throwable ignored) {
+                            }
+                        }
+                    });
+                } catch (Exception ignored) {
+                }
             }
         });
     }

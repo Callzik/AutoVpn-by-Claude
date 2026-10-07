@@ -119,7 +119,7 @@ public final class ConfigBuilder {
 
     private static Map<String, Object> urltest(String tag, List<Object> members) {
         return Json.obj("type", "urltest", "tag", tag, "outbounds", members,
-                "url", TEST_URL, "interval", "3m", "tolerance", 100,
+                "url", TEST_URL, "interval", "1m", "tolerance", 100,
                 "interrupt_exist_connections", false);
     }
 
