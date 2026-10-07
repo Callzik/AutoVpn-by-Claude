@@ -159,6 +159,47 @@ func (c *Clash) TestGroup(group string, timeoutMs int) map[string]int {
 	return res
 }
 
+// TestGroupQuick returns grace after the first answer instead of waiting for silent members to time out.
+// The rest keep testing (their results still reach the core) and done, if not nil, gets the full result.
+func (c *Clash) TestGroupQuick(group string, timeoutMs int, grace time.Duration, done func(map[string]int)) map[string]int {
+	res := map[string]int{}
+	var mu sync.Mutex
+	snapshot := func() map[string]int {
+		mu.Lock()
+		defer mu.Unlock()
+		out := make(map[string]int, len(res))
+		for k, v := range res {
+			out[k] = v
+		}
+		return out
+	}
+	first, all := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	go func() {
+		c.TestTags(c.Members(group), timeoutMs, func(tag string, d int) {
+			if d > 0 {
+				mu.Lock()
+				res[tag] = d
+				mu.Unlock()
+				once.Do(func() { close(first) })
+			}
+		})
+		close(all)
+		if done != nil {
+			done(snapshot())
+		}
+	}()
+	select {
+	case <-all:
+	case <-first:
+		select {
+		case <-all:
+		case <-time.After(grace):
+		}
+	}
+	return snapshot()
+}
+
 // GroupCheck makes a urltest group re-test and re-select.
 func (c *Clash) GroupCheck(group string, timeoutMs int) map[string]int {
 	path := "/group/" + esc(group) + "/delay?url=" + url.QueryEscape(TestURL) + "&timeout=" + strconv.Itoa(timeoutMs)

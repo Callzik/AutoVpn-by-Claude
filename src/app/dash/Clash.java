@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -103,30 +104,61 @@ public final class Clash {
      * which happens right after start and on every network change.)
      * Returns tag → delay for members that answered.
      */
-    public Map<String, Integer> testGroup(String group, final int timeoutMs) throws Exception {
+    public Map<String, Integer> testGroup(String group, int timeoutMs) throws Exception {
+        return testGroup(group, timeoutMs, 0, null);
+    }
+
+    public interface Done { void onDone(Map<String, Integer> all); }
+
+    /**
+     * graceMs > 0: returns graceMs after the first answer instead of waiting for silent members to time out.
+     * The rest keep testing (their results still reach the core) and done, if given, gets the full result.
+     */
+    public Map<String, Integer> testGroup(String group, final int timeoutMs, long graceMs, final Done done) throws Exception {
         JSONArray all = new JSONObject(call("GET", "/proxies/" + enc(group), null, 4000)).optJSONArray("all");
         final Map<String, Integer> m = new ConcurrentHashMap<>();
         if (all == null || all.length() == 0) return m;
-        ExecutorService pool = Executors.newFixedThreadPool(Math.min(all.length(), 64));
-        try {
-            List<Future<?>> fs = new ArrayList<>();
-            for (int i = 0; i < all.length(); i++) {
-                final String tag = all.getString(i);
-                fs.add(pool.submit(new Runnable() {
-                    @Override public void run() {
-                        try {
-                            int d = proxyDelay(tag, ConfigBuilder.TEST_URL, timeoutMs);
-                            if (d > 0) m.put(tag, d);
-                        } catch (Exception ignored) {
+        int n = all.length(), threads = Math.min(n, 64);
+        final long limit = (long) (timeoutMs + 8000) * ((n + threads - 1) / threads);
+        final CountDownLatch left = new CountDownLatch(n);
+        final CountDownLatch first = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        for (int i = 0; i < n; i++) {
+            final String tag = all.getString(i);
+            pool.execute(new Runnable() {
+                @Override public void run() {
+                    try {
+                        int d = proxyDelay(tag, ConfigBuilder.TEST_URL, timeoutMs);
+                        if (d > 0) {
+                            m.put(tag, d);
+                            first.countDown();
                         }
+                    } catch (Exception ignored) {
+                    } finally {
+                        left.countDown();
                     }
-                }));
+                }
+            });
+        }
+        pool.shutdown();
+        if (done != null) {
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        left.await(limit, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException ignored) {
+                    }
+                    done.onDone(new HashMap<>(m));
+                }
+            }, "ping-rest").start();
+        }
+        try {
+            if (graceMs > 0) {
+                if (first.await(limit, TimeUnit.MILLISECONDS)) left.await(graceMs, TimeUnit.MILLISECONDS);
+            } else {
+                left.await(limit, TimeUnit.MILLISECONDS);
             }
-            for (Future<?> f : fs) {
-                try { f.get(timeoutMs + 8000, TimeUnit.MILLISECONDS); } catch (Exception ignored) { }
-            }
-        } finally {
-            pool.shutdownNow();
+        } catch (InterruptedException ignored) {
         }
         return new HashMap<>(m);
     }
