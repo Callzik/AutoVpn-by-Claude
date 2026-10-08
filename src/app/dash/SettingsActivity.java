@@ -174,6 +174,23 @@ public class SettingsActivity extends Activity {
         rt.addView(Ui.text(c, "Изменения применятся после переподключения.", 13, Ui.MUTED, false));
         col.addView(rt, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
 
+        // Main screen builder
+        col.addView(section(c, "Внешний вид"));
+        LinearLayout home = Ui.card(c);
+        LinearLayout homeRow = Ui.row(c);
+        LinearLayout homeText = new LinearLayout(c);
+        homeText.setOrientation(LinearLayout.VERTICAL);
+        homeText.addView(Ui.text(c, "Главный экран", 15, Ui.FG, true));
+        homeText.addView(Ui.text(c, "Какие плашки показывать и в каком порядке", 13, Ui.MUTED, false));
+        homeRow.addView(homeText, Ui.weight());
+        homeRow.addView(Ui.text(c, "›", 24, Ui.MUTED, false));
+        homeRow.setMinimumHeight(Ui.dp(c, 48));
+        homeRow.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { startActivity(new Intent(SettingsActivity.this, HomeLayoutActivity.class)); }
+        });
+        home.addView(homeRow);
+        col.addView(home, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+
         // Apps
         col.addView(section(c, "Приложения"));
         LinearLayout apps = Ui.card(c);

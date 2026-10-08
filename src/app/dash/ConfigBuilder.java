@@ -10,6 +10,8 @@ public final class ConfigBuilder {
     public static final String GROUP_LTE = "auto-lte";
     public static final String SELECTOR = "proxy";
     public static final int CLASH_PORT = 19190;
+    /** Local proxy only Dash uses (password = Clash secret) to see the VPN exit IP. */
+    public static final int PROBE_PORT = 19191;
     public static final String TEST_URL = "https://www.gstatic.com/generate_204";
 
     public static final class Options {
@@ -85,6 +87,7 @@ public final class ConfigBuilder {
         List<Object> rules = new ArrayList<>();
         rules.add(Json.obj("action", "sniff"));
         rules.add(Json.obj("protocol", "dns", "action", "hijack-dns"));
+        rules.add(Json.obj("inbound", Json.arr("probe-in"), "outbound", SELECTOR));
         rules.add(Json.obj("ip_is_private", true, "outbound", "direct"));
         rules.add(Json.obj("rule_set", Json.arr("ru-inside"), "outbound", "direct"));
         if (opt.blockedViaVpn) rules.add(Json.obj("rule_set", Json.arr("ru-blocked", "ru-blocked-ip"), "outbound", SELECTOR));
@@ -108,7 +111,9 @@ public final class ConfigBuilder {
         Map<String, Object> root = Json.obj(
                 "log", Json.obj("level", opt.logLevel, "timestamp", true),
                 "dns", dns,
-                "inbounds", Json.arr(tun),
+                "inbounds", Json.arr(tun, Json.obj("type", "mixed", "tag", "probe-in",
+                        "listen", "127.0.0.1", "listen_port", PROBE_PORT,
+                        "users", Json.arr(Json.obj("username", "dash", "password", opt.secret)))),
                 "outbounds", outbounds,
                 "route", route,
                 "experimental", Json.obj("clash_api", Json.obj(

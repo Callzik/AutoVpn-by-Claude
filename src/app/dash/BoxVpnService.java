@@ -74,6 +74,9 @@ public class BoxVpnService extends VpnService {
 
     private Prefs prefs;
     private Clash clash;
+
+    /** Clash API of the running core, null when stopped. */
+    Clash clashApi() { return running ? clash : null; }
     private List<Server> servers = new ArrayList<>();
     private final Map<String, Server> byTag = new HashMap<>();
     private boolean hasRegular, hasLte;

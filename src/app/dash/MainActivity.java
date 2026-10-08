@@ -34,6 +34,9 @@ public class MainActivity extends Activity {
     private View mainView, onboardingView;
 
     private TextView netChip, title, subtitle, banner, wlBadge, srvName, srvSub, srvBadge, pingBtn, errorText;
+    private TextView speedVal, trafficVal, ipFlag, ipText, ipCountry;
+    private LinearLayout tilesBox;
+    private String tilesSig;
     private PowerButton power;
     private LinearLayout updCard;
     private TextView updText, updBtn;
@@ -127,6 +130,7 @@ public class MainActivity extends Activity {
         super.onResume();
         AppState.addListener(listener);
         handler.post(ticker);
+        if (tilesBox != null) rebuildTiles();
         showScreen();
         Updater.check(this, false);
     }
@@ -221,45 +225,134 @@ public class MainActivity extends Activity {
         updCard.setVisibility(View.GONE);
         col.addView(updCard, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
 
-        // tiles: ping (tap = re-ping), white lists
-        LinearLayout tiles = new LinearLayout(c);
-        tiles.setOrientation(LinearLayout.HORIZONTAL);
-        pingBtn = tile(tiles, "Пинг", true);
-        ((View) pingBtn.getParent()).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                BoxVpnService s = BoxVpnService.instance;
-                if (s != null && AppState.vpn == AppState.ON) s.pingCurrent();
-            }
-        });
-        wlBadge = tile(tiles, "Белые списки", false);
-        col.addView(tiles, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
-
-        // server card
-        LinearLayout srv = Ui.row(c);
-        srv.setBackground(Ui.round(c, Ui.SURFACE, 18, Ui.LINE));
-        srv.setPadding(Ui.dp(c, 16), Ui.dp(c, 16), Ui.dp(c, 14), Ui.dp(c, 16));
-        LinearLayout srvText = new LinearLayout(c);
-        srvText.setOrientation(LinearLayout.VERTICAL);
-        srvName = Ui.text(c, "Автовыбор сервера", 16, Ui.FG, true);
-        srvName.setSingleLine(true);
-        srvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        srvSub = Ui.text(c, "", 13, Ui.MUTED, false);
-        srvSub.setSingleLine(true);
-        srvSub.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        srvText.addView(srvName);
-        srvText.addView(srvSub, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
-        srv.addView(srvText, Ui.weight());
-        srv.addView(Ui.text(c, "›", 24, Ui.MUTED, false));
-        srv.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, ServersActivity.class)); }
-        });
-        col.addView(srv, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
+        // tiles: built from the user's layout (Settings → Главный экран)
+        tilesBox = new LinearLayout(c);
+        tilesBox.setOrientation(LinearLayout.VERTICAL);
+        col.addView(tilesBox, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0));
+        rebuildTiles();
 
         return sv;
     }
 
-    /** One stat tile; returns its value TextView. */
-    private TextView tile(LinearLayout parent, String label, boolean mono) {
+    /** Re-creates the tiles when the layout changed; references of hidden tiles become null. */
+    private void rebuildTiles() {
+        String sig = Tiles.signature(prefs);
+        if (sig.equals(tilesSig)) return;
+        tilesSig = sig;
+        Context c = this;
+        tilesBox.removeAllViews();
+        pingBtn = wlBadge = speedVal = trafficVal = ipFlag = ipText = ipCountry = srvName = srvSub = null;
+        View.OnLongClickListener edit = new View.OnLongClickListener() {
+            @Override public boolean onLongClick(View v) {
+                startActivity(new Intent(MainActivity.this, HomeLayoutActivity.class));
+                return true;
+            }
+        };
+        LinearLayout pair = null; // row waiting for a second narrow tile
+        for (Tiles.Item it : Tiles.load(prefs)) {
+            if (!it.on) continue;
+            View v = makeTile(it.id);
+            v.setOnLongClickListener(edit);
+            if (Tiles.wide(it.id)) {
+                pair = null;
+                tilesBox.addView(v, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
+            } else if (pair == null) {
+                pair = new LinearLayout(c);
+                pair.setOrientation(LinearLayout.HORIZONTAL);
+                pair.addView(v, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                tilesBox.addView(pair, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 10));
+            } else {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                lp.leftMargin = Ui.dp(c, 10);
+                pair.addView(v, lp);
+                pair = null;
+            }
+        }
+    }
+
+    private View makeTile(String id) {
+        Context c = this;
+        switch (id) {
+            case Tiles.PING: {
+                LinearLayout t = statTile("Пинг, мс");
+                pingBtn = statValue(t, true);
+                t.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        BoxVpnService s = BoxVpnService.instance;
+                        if (s != null && AppState.vpn == AppState.ON) s.pingCurrent();
+                    }
+                });
+                return t;
+            }
+            case Tiles.WL: {
+                LinearLayout t = statTile("Белые списки");
+                wlBadge = statValue(t, false);
+                return t;
+            }
+            case Tiles.SPEED: {
+                LinearLayout t = statTile("Скорость, Мбит/с");
+                speedVal = statValue(t, true);
+                return t;
+            }
+            case Tiles.TRAFFIC: {
+                LinearLayout t = statTile("Трафик");
+                trafficVal = statValue(t, true);
+                return t;
+            }
+            case Tiles.IP: {
+                LinearLayout t = Ui.row(c);
+                t.setBackground(Ui.round(c, Ui.SURFACE, 16, Ui.LINE));
+                t.setPadding(Ui.dp(c, 14), Ui.dp(c, 12), Ui.dp(c, 14), Ui.dp(c, 12));
+                ipFlag = Ui.text(c, "🌐", 26, Ui.FG, false);
+                t.addView(ipFlag);
+                LinearLayout txt = new LinearLayout(c);
+                txt.setOrientation(LinearLayout.VERTICAL);
+                txt.setPadding(Ui.dp(c, 12), 0, 0, 0);
+                txt.addView(Ui.text(c, "Внешний IP", 12, Ui.MUTED, false));
+                ipText = Ui.text(c, "—", 18, Ui.FG, true);
+                ipText.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+                ipText.setSingleLine(true);
+                txt.addView(ipText, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
+                t.addView(txt, Ui.weight());
+                ipCountry = Ui.text(c, "", 13, Ui.MUTED, false);
+                ipCountry.setGravity(Gravity.END);
+                ipCountry.setMaxWidth(Ui.dp(c, 130));
+                t.addView(ipCountry);
+                t.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        if (Stats.ip.isEmpty()) { Stats.refreshIp(); return; }
+                        android.content.ClipboardManager cb = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        cb.setPrimaryClip(ClipData.newPlainText("ip", Stats.ip));
+                        Toast.makeText(MainActivity.this, "IP скопирован", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                return t;
+            }
+            default: { // server card
+                LinearLayout srv = Ui.row(c);
+                srv.setBackground(Ui.round(c, Ui.SURFACE, 18, Ui.LINE));
+                srv.setPadding(Ui.dp(c, 16), Ui.dp(c, 16), Ui.dp(c, 14), Ui.dp(c, 16));
+                LinearLayout srvText = new LinearLayout(c);
+                srvText.setOrientation(LinearLayout.VERTICAL);
+                srvName = Ui.text(c, "Автовыбор сервера", 16, Ui.FG, true);
+                srvName.setSingleLine(true);
+                srvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                srvSub = Ui.text(c, "", 13, Ui.MUTED, false);
+                srvSub.setSingleLine(true);
+                srvSub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                srvText.addView(srvName);
+                srvText.addView(srvSub, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
+                srv.addView(srvText, Ui.weight());
+                srv.addView(Ui.text(c, "›", 24, Ui.MUTED, false));
+                srv.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) { startActivity(new Intent(MainActivity.this, ServersActivity.class)); }
+                });
+                return srv;
+            }
+        }
+    }
+
+    private LinearLayout statTile(String label) {
         Context c = this;
         LinearLayout t = new LinearLayout(c);
         t.setOrientation(LinearLayout.VERTICAL);
@@ -269,13 +362,16 @@ public class MainActivity extends Activity {
         l.setSingleLine(true);
         l.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.addView(l);
+        return t;
+    }
+
+    private TextView statValue(LinearLayout t, boolean mono) {
+        Context c = this;
         TextView v = Ui.text(c, "—", mono ? 20 : 18, Ui.FG, true);
         if (mono) v.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
         v.setSingleLine(true);
-        t.addView(v, Ui.lp(c, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        if (parent.getChildCount() > 0) lp.leftMargin = Ui.dp(c, 10);
-        parent.addView(t, lp);
+        v.setAutoSizeTextTypeUniformWithConfiguration(11, mono ? 20 : 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        t.addView(v, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 28)));
         return v;
     }
 
@@ -350,13 +446,19 @@ public class MainActivity extends Activity {
             updBtn.setText(Updater.error.isEmpty() ? "Обновить" : "Ещё раз");
         }
 
-        // tile: ping
         boolean on = s == AppState.ON;
+        Stats.tick();
+        renderStats(on);
+
+        // tile: ping
+        if (pingBtn != null) {
         pingBtn.setText(!on ? "—" : AppState.pingingCurrent ? "…" : AppState.ping > 0 ? String.valueOf(AppState.ping) : "—");
         pingBtn.setTextColor(!on || AppState.pingingCurrent || AppState.ping <= 0 ? Ui.FG
                 : AppState.ping < 300 ? Ui.ACCENT : AppState.ping < 400 ? Ui.WARN : Ui.BAD);
+        }
 
         // tile: white lists
+        if (wlBadge != null) {
         int wlColor = Ui.FG;
         if (AppState.wlChecking) wlBadge.setText("…");
         else if (AppState.wl == AppState.WL_ON) { wlBadge.setText("вкл"); wlColor = Ui.WARN; }
@@ -365,8 +467,10 @@ public class MainActivity extends Activity {
         else if (AppState.wl == AppState.WL_NONET) { wlBadge.setText("нет сети"); wlColor = Ui.BAD; }
         else wlBadge.setText("—");
         wlBadge.setTextColor(wlColor);
+        }
 
         // server card
+        if (srvName == null) return;
         boolean manual = !AppState.pinned.isEmpty();
         String grp = "auto-lte".equals(AppState.group) ? "LTE" : "основные";
         if (on && !AppState.serverName.isEmpty()) {
@@ -382,6 +486,30 @@ public class MainActivity extends Activity {
         } else {
             srvName.setText(manual ? AppState.pinned : "Автовыбор сервера");
             srvSub.setText(manual ? "Выбран вручную" : "Самый быстрый из доступных");
+        }
+    }
+
+    private void renderStats(boolean on) {
+        if (speedVal != null) {
+            speedVal.setText(on && Stats.hasTraffic ? "↓" + Stats.mbit(Stats.downRate) + " ↑" + Stats.mbit(Stats.upRate) : "—");
+        }
+        if (trafficVal != null) {
+            trafficVal.setText(on && Stats.hasTraffic ? "↓" + Stats.bytes(Stats.down) + " ↑" + Stats.bytes(Stats.up) : "—");
+        }
+        if (ipText != null) {
+            if (!on) {
+                ipFlag.setText("🌐");
+                ipText.setText("—");
+                ipCountry.setText("");
+            } else if (!Stats.ip.isEmpty()) {
+                ipFlag.setText(Stats.flag(Stats.cc));
+                ipText.setText(Stats.ip);
+                ipCountry.setText(Stats.country);
+            } else {
+                ipFlag.setText("🌐");
+                ipText.setText(Stats.ipBusy ? "…" : "—");
+                ipCountry.setText(Stats.ipFailed && !Stats.ipBusy ? "не удалось, нажмите" : "");
+            }
         }
     }
 

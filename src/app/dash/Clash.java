@@ -26,6 +26,14 @@ public final class Clash {
 
     public Clash(String secret) { this.secret = secret; }
 
+    String secret() { return secret; }
+
+    /** Bytes {down, up} the core has moved since it started. */
+    long[] totals() throws Exception {
+        JSONObject o = new JSONObject(call("GET", "/connections", null, 3000));
+        return new long[]{o.optLong("downloadTotal", 0), o.optLong("uploadTotal", 0)};
+    }
+
     private String call(String method, String path, String body, int readTimeout) throws Exception {
         URL u = new URL("http://127.0.0.1:" + ConfigBuilder.CLASH_PORT + path);
         HttpURLConnection c = (HttpURLConnection) u.openConnection();

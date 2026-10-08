@@ -21,6 +21,10 @@ public final class Changelog {
         ENTRIES.put(31, new String[]{
                 "Пинг до 300 мс теперь считается хорошим и подсвечивается зелёным",
         });
+        ENTRIES.put(32, new String[]{
+                "Конструктор главного экрана: плашки можно прятать и переставлять (Настройки → Главный экран или долгое нажатие на плашку)",
+                "Новые плашки: скорость, трафик за подключение, внешний IP с флагом страны",
+        });
     }
 
     /** Entries for every version newer than {@code fromCode} up to and including {@code toCode}, oldest first. */
