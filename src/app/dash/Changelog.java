@@ -25,6 +25,9 @@ public final class Changelog {
                 "Конструктор главного экрана: плашки можно прятать и переставлять (Настройки → Главный экран или долгое нажатие на плашку)",
                 "Новые плашки: скорость, трафик за подключение, внешний IP с флагом страны",
         });
+        ENTRIES.put(33, new String[]{
+                "Исправлена уязвимость: другие приложения больше не могут запускать экраны через Dash",
+        });
     }
 
     /** Entries for every version newer than {@code fromCode} up to and including {@code toCode}, oldest first. */

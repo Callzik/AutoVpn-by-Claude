@@ -116,11 +116,6 @@ public class MainActivity extends Activity {
 
     /** Tile / widget asked to connect but needed the screen (permission or subscription). */
     private void handleIntent(Intent intent) {
-        if (intent != null && Updater.ACTION_STATUS.equals(intent.getAction())) {
-            Updater.onStatus(this, intent);
-            intent.setAction(null);
-            return;
-        }
         if (intent == null || !intent.getBooleanExtra(VpnControl.EXTRA_CONNECT, false)) return;
         intent.removeExtra(VpnControl.EXTRA_CONNECT);
         if (AppState.vpn == AppState.OFF && !prefs.subUrl().trim().isEmpty()) toggle();

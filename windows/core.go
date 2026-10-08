@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -651,7 +652,14 @@ func (c *Core) startProc(g int, prefix, bin string, args []string, critical bool
 	hideWindow(cmd)
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
-	if err := cmd.Start(); err != nil {
+	release, err := verifyCore(bin)
+	if err != nil {
+		c.log.Add("Ядро не запущено: " + err.Error())
+		return nil, errors.New("ядро повреждено или подменено, переустановите Dash")
+	}
+	err = cmd.Start()
+	release()
+	if err != nil {
 		return nil, err
 	}
 	afterStart(cmd)

@@ -178,7 +178,7 @@ public final class Updater {
                 while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
                 s.fsync(o);
             }
-            Intent i = new Intent(c, MainActivity.class).setAction(ACTION_STATUS);
+            Intent i = new Intent(c, InstallStatusActivity.class).setAction(ACTION_STATUS); // explicit, non-exported target
             PendingIntent p = PendingIntent.getActivity(c, 7, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
             s.commit(p.getIntentSender());
@@ -190,7 +190,12 @@ public final class Updater {
         int st = i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             Intent confirm = i.getParcelableExtra(Intent.EXTRA_INTENT);
-            if (confirm != null) act.startActivity(confirm);
+            if (confirm != null) {
+                confirm.setFlags(confirm.getFlags() & ~(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION));
+                act.startActivity(confirm);
+            }
             return;
         }
         progress = -1;

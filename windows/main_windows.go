@@ -3,6 +3,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	_ "embed"
 	"os"
 	"os/exec"
@@ -50,10 +51,14 @@ func singleInstance() bool {
 	return true
 }
 
-// writeIfChanged extracts a bundled core unless the same file is already there.
+// writeIfChanged extracts a bundled core unless an identical file (same SHA-256) is already there.
+// The folder is admin-only; the hash is checked again right before every start (verifyCore).
 func writeIfChanged(path string, data []byte) error {
-	if st, err := os.Stat(path); err == nil && st.Size() == int64(len(data)) {
-		return nil
+	registerCore(path, data)
+	if !isReparse(path) {
+		if sum, err := fileSum(path); err == nil && sum == sha256.Sum256(data) {
+			return nil
+		}
 	}
 	tmp := path + ".new"
 	if err := os.WriteFile(tmp, data, 0700); err != nil {
@@ -106,7 +111,6 @@ func main() {
 			connect = true
 		}
 	}
-	cleanupOldExe()
 	if !singleInstance() {
 		return
 	}
@@ -114,6 +118,11 @@ func main() {
 		msgBox("Dash нужен запуск от имени администратора: без этого Windows не даёт создать VPN-подключение.")
 		return
 	}
+	if err := prepareDataRoot(); err != nil {
+		msgBox("Не удалось подготовить защищённую папку " + dataRoot() + ": " + err.Error())
+		return
+	}
+	cleanupOldExe()
 	initJob()
 	binDir := filepath.Join(dataRoot(), "bin", Version)
 	if err := os.MkdirAll(binDir, 0700); err == nil {
@@ -148,9 +157,23 @@ func main() {
 	app.API.quit = func() { w.Dispatch(func() { w.Terminate() }) }
 	app.Upd.restart = func(newExe string) {
 		wasOn := app.Core.View().State != StOff
+		want, err := fileSum(newExe) // newExe sits in the admin-only folder, its zip was checked against version.json
+		if err != nil {
+			app.Log.Add("Обновление: " + err.Error())
+			app.Upd.fail("Не удалось установить обновление")
+			return
+		}
 		self, err := swapExe(newExe)
 		if err != nil {
 			app.Log.Add("Не удалось заменить Dash.exe: " + err.Error())
+			app.Upd.fail("Не удалось установить обновление")
+			return
+		}
+		// Dash.exe's own folder may be writable by other programs: lock the new exe and check it
+		// is exactly the downloaded build before starting it elevated
+		lock, err := lockVerified(self, want)
+		if err != nil {
+			app.Log.Add("Обновление: новый Dash.exe не прошёл проверку: " + err.Error())
 			app.Upd.fail("Не удалось установить обновление")
 			return
 		}
@@ -159,7 +182,9 @@ func main() {
 		if wasOn {
 			args = append(args, "--connect")
 		}
-		if err := exec.Command(self, args...).Start(); err != nil {
+		err = exec.Command(self, args...).Start()
+		windows.CloseHandle(lock)
+		if err != nil {
 			app.Log.Add("Не удалось запустить новую версию: " + err.Error())
 			app.Upd.fail("Перезапустите Dash вручную")
 			return

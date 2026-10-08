@@ -4,9 +4,9 @@ package main
 
 import (
 	"os"
-	"strconv"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 )
 
 const (
@@ -36,7 +36,7 @@ func killProc(cmd *exec.Cmd) {
 }
 
 func machineID() string { return "" }
-func osVersion() string  { return "linux" }
+func osVersion() string { return "linux" }
 func deviceModel() string {
 	h, _ := os.Hostname()
 	return h
@@ -48,6 +48,7 @@ func dataRoot() string {
 	return filepath.Join(os.TempDir(), "dash-test")
 }
 
+func verifyCore(bin string) (func(), error) { return func() {}, nil }
 func runningApps() []string                 { return nil }
 func swapExe(newExe string) (string, error) { return newExe, nil }
 func cleanupOldExe()                        {}

@@ -61,13 +61,6 @@ func deviceModel() string {
 	return h
 }
 
-func dataRoot() string {
-	if d := os.Getenv("LOCALAPPDATA"); d != "" {
-		return d + `\Dash`
-	}
-	return `C:\Dash`
-}
-
 // system and own processes that make no sense to exclude from the VPN
 var skipProcs = map[string]bool{"system": true, "[system process]": true, "registry": true, "smss.exe": true, "csrss.exe": true,
 	"wininit.exe": true, "services.exe": true, "lsass.exe": true, "winlogon.exe": true, "svchost.exe": true, "dwm.exe": true,
