@@ -167,8 +167,10 @@ func main() {
 		app.API.quit()
 	}
 	w.SetSize(440, 820, webview2.HintMin)
+	tr := newTray(uintptr(w.Window()), app, app.API.quit)
 	w.Navigate(app.URL())
 	w.Run()
+	tr.Remove()
 	app.Core.Disconnect("Выход")
 	w.Destroy()
 }
