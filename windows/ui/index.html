@@ -223,7 +223,7 @@ function show(v){
   if(v==='apps')loadApps();
 }
 function dur(sec){sec=Math.max(0,sec);const p=n=>String(n).padStart(2,'0');return p(Math.floor(sec/3600))+':'+p(Math.floor(sec/60)%60)+':'+p(sec%60)}
-function pc(p){return p<150?'good':p<400?'mid':'bad'}
+function pc(p){return p<300?'good':p<400?'mid':'bad'}
 
 async function poll(){
   let R;try{R=await api('/api/state')}catch(e){return}

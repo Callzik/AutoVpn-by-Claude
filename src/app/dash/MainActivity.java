@@ -354,7 +354,7 @@ public class MainActivity extends Activity {
         boolean on = s == AppState.ON;
         pingBtn.setText(!on ? "—" : AppState.pingingCurrent ? "…" : AppState.ping > 0 ? String.valueOf(AppState.ping) : "—");
         pingBtn.setTextColor(!on || AppState.pingingCurrent || AppState.ping <= 0 ? Ui.FG
-                : AppState.ping < 150 ? Ui.ACCENT : AppState.ping < 400 ? Ui.WARN : Ui.BAD);
+                : AppState.ping < 300 ? Ui.ACCENT : AppState.ping < 400 ? Ui.WARN : Ui.BAD);
 
         // tile: white lists
         int wlColor = Ui.FG;

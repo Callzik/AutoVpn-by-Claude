@@ -251,7 +251,7 @@ public class ServersActivity extends Activity {
                 right.setTextColor(Ui.ACCENT);
             } else if (p > 0) {
                 right.setText(p + " мс");
-                right.setTextColor(p < 150 ? Ui.ACCENT : p < 400 ? Ui.WARN : Ui.BAD);
+                right.setTextColor(p < 300 ? Ui.ACCENT : p < 400 ? Ui.WARN : Ui.BAD);
             } else if (p < 0) {
                 right.setText("—");
                 right.setTextColor(Ui.BAD);

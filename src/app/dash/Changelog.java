@@ -18,6 +18,9 @@ public final class Changelog {
                 "После обновления показывается список изменений",
                 "В настройках появилась кнопка «Проверить обновление»",
         });
+        ENTRIES.put(31, new String[]{
+                "Пинг до 300 мс теперь считается хорошим и подсвечивается зелёным",
+        });
     }
 
     /** Entries for every version newer than {@code fromCode} up to and including {@code toCode}, oldest first. */
