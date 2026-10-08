@@ -25,19 +25,60 @@ import (
 // as deny-only, so it can neither read nor change anything inside.
 const adminOnlySDDL = "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x20000;;;OW)"
 
+// dataRoot comes from the shell's known folder, not from %ProgramData%: the elevated process
+// inherits the user's environment, which any non-admin program can change (HKCU\Environment).
 func dataRoot() string {
-	pd := os.Getenv("ProgramData")
-	if pd == "" {
+	pd, err := windows.KnownFolderPath(windows.FOLDERID_ProgramData, 0)
+	if err != nil || pd == "" {
 		pd = `C:\ProgramData`
 	}
 	return filepath.Join(pd, "Dash")
 }
 
 func oldDataRoot() string {
-	if d := os.Getenv("LOCALAPPDATA"); d != "" {
-		return d + `\Dash`
+	if d, err := windows.KnownFolderPath(windows.FOLDERID_LocalAppData, 0); err == nil && d != "" {
+		return filepath.Join(d, "Dash")
 	}
 	return ""
+}
+
+// hardenProcess runs first in main: DLLs only from System32 (WebView2Loader.dll planted next to
+// Dash.exe is ignored, the copy built into Dash is used) and no user-set variables that change
+// what WebView2 or the cores load.
+func hardenProcess() {
+	_ = windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32)
+	for _, kv := range os.Environ() {
+		k := strings.ToUpper(strings.SplitN(kv, "=", 2)[0])
+		if strings.HasPrefix(k, "WEBVIEW2_") || strings.HasPrefix(k, "XRAY_") || strings.HasPrefix(k, "V2RAY_") ||
+			strings.HasPrefix(k, "SING_BOX") || strings.HasPrefix(k, "ENABLE_DEPRECATED") {
+			_ = os.Unsetenv(strings.SplitN(kv, "=", 2)[0])
+		}
+	}
+}
+
+// finalPath is the real path behind an open handle, so a junction swapped after the check
+// cannot redirect what gets started.
+func finalPath(h windows.Handle) (string, error) {
+	buf := make([]uint16, 1024)
+	n, err := windows.GetFinalPathNameByHandle(h, &buf[0], uint32(len(buf)), 0)
+	if err != nil {
+		return "", err
+	}
+	if int(n) > len(buf) {
+		buf = make([]uint16, n)
+		if n, err = windows.GetFinalPathNameByHandle(h, &buf[0], uint32(len(buf)), 0); err != nil {
+			return "", err
+		}
+	}
+	return windows.UTF16ToString(buf[:n]), nil
+}
+
+func system32(exe string) string {
+	d, err := windows.GetSystemDirectory()
+	if err != nil {
+		d = `C:\Windows\System32`
+	}
+	return filepath.Join(d, exe)
 }
 
 func isReparse(path string) bool {
@@ -170,9 +211,6 @@ func lockVerified(path string, want [32]byte) (windows.Handle, error) {
 	f := os.NewFile(uintptr(h), path)
 	hs := sha256.New()
 	_, err = io.Copy(hs, f)
-	if err == nil {
-		_, err = f.Seek(0, io.SeekStart)
-	}
 	var got [32]byte
 	copy(got[:], hs.Sum(nil))
 	if err != nil || got != want {

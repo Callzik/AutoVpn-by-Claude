@@ -100,6 +100,7 @@ func attachToJob(cmd *exec.Cmd) {
 }
 
 func main() {
+	hardenProcess()
 	connect := false
 	for i, a := range os.Args {
 		if a == "--after-update" && i+1 < len(os.Args) {
@@ -149,7 +150,7 @@ func main() {
 	if w == nil {
 		// no WebView2 runtime: use the browser, quit from the page
 		app.API.quit = func() { close(done) }
-		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", app.URL()).Start()
+		_ = exec.Command(system32("rundll32.exe"), "url.dll,FileProtocolHandler", app.URL()).Start()
 		<-done
 		app.Core.Disconnect("Выход")
 		return
@@ -182,7 +183,10 @@ func main() {
 		if wasOn {
 			args = append(args, "--connect")
 		}
-		err = exec.Command(self, args...).Start()
+		run, err := finalPath(lock)
+		if err == nil {
+			err = exec.Command(run, args...).Start()
+		}
 		windows.CloseHandle(lock)
 		if err != nil {
 			app.Log.Add("Не удалось запустить новую версию: " + err.Error())

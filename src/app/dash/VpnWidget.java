@@ -18,10 +18,8 @@ public class VpnWidget extends AppWidgetProvider {
         updateAll(c, m);
     }
 
-    @Override
-    public void onReceive(Context c, Intent intent) {
-        super.onReceive(c, intent);
-        if (!ACTION_TOGGLE.equals(intent.getAction())) return;
+    /** The tap goes to WidgetToggleReceiver: not exported, so other apps cannot switch the VPN. */
+    static void toggle(Context c) {
         VpnControl.init(c);
         if (VpnControl.isActive()) {
             VpnControl.stop(c);
@@ -82,7 +80,7 @@ public class VpnWidget extends AppWidgetProvider {
             pi = PendingIntent.getActivity(c, 2, VpnControl.openAppIntent(c, true),
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         } else {
-            Intent toggle = new Intent(c, VpnWidget.class).setAction(ACTION_TOGGLE);
+            Intent toggle = new Intent(c, WidgetToggleReceiver.class).setAction(ACTION_TOGGLE);
             pi = PendingIntent.getBroadcast(c, 0, toggle,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         }

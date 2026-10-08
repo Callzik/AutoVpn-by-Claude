@@ -82,6 +82,9 @@
         </service>
 
         <receiver
+            android:name=".WidgetToggleReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".VpnWidget"
             android:exported="true"
             android:label="@string/app_name">
