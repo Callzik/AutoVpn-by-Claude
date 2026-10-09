@@ -205,8 +205,8 @@ public class SettingsActivity extends Activity {
             }
         });
         shareButtons.addView(shCopy, Ui.weight());
-        View gap = new View(c);
-        shareButtons.addView(gap, new LinearLayout.LayoutParams(Ui.dp(c, 8), 1));
+        View shGap = new View(c);
+        shareButtons.addView(shGap, new LinearLayout.LayoutParams(Ui.dp(c, 8), 1));
         shareButtons.addView(shReset, Ui.weight());
         sh.addView(shareButtons, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
         col.addView(sh, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
