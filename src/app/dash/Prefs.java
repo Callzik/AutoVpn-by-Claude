@@ -89,6 +89,32 @@ public final class Prefs {
     public boolean blockedVpn() { return p.getBoolean("blocked_vpn", true); }
     public void blockedVpn(boolean v) { p.edit().putBoolean("blocked_vpn", v).apply(); }
 
+    /* ---------- VPN for hotspot clients: a password-protected local proxy ---------- */
+
+    public static final int SHARE_PORT = 10808;
+
+    public boolean shareProxy() { return p.getBoolean("share_proxy", false); }
+    public void shareProxy(boolean v) { p.edit().putBoolean("share_proxy", v).apply(); }
+
+    public String shareUser() { return shareCred("share_user", 4); }
+    public String sharePass() { return shareCred("share_pass", 8); }
+
+    /** New login and password, e.g. when they leaked to someone else. */
+    public void resetShareCreds() { p.edit().remove("share_user").remove("share_pass").apply(); }
+
+    private synchronized String shareCred(String key, int bytes) {
+        String v = p.getString(key, "");
+        if (v.isEmpty()) {
+            byte[] b = new byte[bytes];
+            new java.security.SecureRandom().nextBytes(b);
+            StringBuilder sb = new StringBuilder();
+            for (byte x : b) sb.append(String.format(java.util.Locale.ROOT, "%02x", x & 0xff));
+            v = sb.toString();
+            p.edit().putString(key, v).apply();
+        }
+        return v;
+    }
+
     /** Apps that go around the VPN (package names). */
     public java.util.Set<String> excludedApps() {
         return new java.util.HashSet<>(p.getStringSet("excluded_apps", new java.util.HashSet<String>()));

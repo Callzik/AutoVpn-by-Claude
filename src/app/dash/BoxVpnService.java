@@ -415,6 +415,12 @@ public class BoxVpnService extends VpnService {
         opt.ruleDir = rulesDir.getAbsolutePath();
         opt.secret = secret;
         opt.initialGroup = group;
+        if (prefs.shareProxy()) {
+            opt.sharePort = Prefs.SHARE_PORT;
+            opt.shareUser = prefs.shareUser();
+            opt.sharePass = prefs.sharePass();
+            AppState.log("Раздача: прокси на порту " + Prefs.SHARE_PORT + " (" + ShareInfo.addresses() + ")");
+        }
         prepareXray();
         String config = ConfigBuilder.build(servers, opt);
         File cfg = new File(getFilesDir(), "config.json");

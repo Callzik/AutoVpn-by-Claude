@@ -21,6 +21,10 @@ public final class ConfigBuilder {
         public String secret = "";
         public String initialGroup = GROUP_REGULAR;
         public String logLevel = "debug";
+        /** Proxy for hotspot clients; off when shareUser is empty. */
+        public int sharePort = 0;
+        public String shareUser = "";
+        public String sharePass = "";
     }
 
     private ConfigBuilder() {}
@@ -111,15 +115,27 @@ public final class ConfigBuilder {
         Map<String, Object> root = Json.obj(
                 "log", Json.obj("level", opt.logLevel, "timestamp", true),
                 "dns", dns,
-                "inbounds", Json.arr(tun, Json.obj("type", "mixed", "tag", "probe-in",
-                        "listen", "127.0.0.1", "listen_port", PROBE_PORT,
-                        "users", Json.arr(Json.obj("username", "dash", "password", opt.secret)))),
+                "inbounds", inbounds(tun, opt),
                 "outbounds", outbounds,
                 "route", route,
                 "experimental", Json.obj("clash_api", Json.obj(
                         "external_controller", "127.0.0.1:" + CLASH_PORT,
                         "secret", opt.secret)));
         return Json.write(root);
+    }
+
+    private static List<Object> inbounds(Map<String, Object> tun, Options opt) {
+        List<Object> in = Json.arr(tun, Json.obj("type", "mixed", "tag", "probe-in",
+                "listen", "127.0.0.1", "listen_port", PROBE_PORT,
+                "users", Json.arr(Json.obj("username", "dash", "password", opt.secret))));
+        if (!opt.shareUser.isEmpty() && opt.sharePort > 0) {
+            // SOCKS5 + HTTP on every interface (the hotspot address is not known in advance);
+            // a login is mandatory, so strangers on the same Wi-Fi cannot use it
+            in.add(Json.obj("type", "mixed", "tag", "share-in",
+                    "listen", "0.0.0.0", "listen_port", opt.sharePort,
+                    "users", Json.arr(Json.obj("username", opt.shareUser, "password", opt.sharePass))));
+        }
+        return in;
     }
 
     private static Map<String, Object> urltest(String tag, List<Object> members) {
