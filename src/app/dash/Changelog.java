@@ -28,6 +28,9 @@ public final class Changelog {
         ENTRIES.put(33, new String[]{
                 "Исправлены уязвимости: другие приложения больше не могут запускать экраны через Dash и выключать VPN через виджет",
         });
+        ENTRIES.put(34, new String[]{
+                "VPN для точки доступа: устройства, подключённые к телефону, могут ходить через VPN по прокси (Настройки → Раздача)",
+        });
     }
 
     /** Entries for every version newer than {@code fromCode} up to and including {@code toCode}, oldest first. */
