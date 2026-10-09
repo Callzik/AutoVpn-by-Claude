@@ -174,6 +174,44 @@ public class SettingsActivity extends Activity {
         rt.addView(Ui.text(c, "Изменения применятся после переподключения.", 13, Ui.MUTED, false));
         col.addView(rt, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
 
+        // Sharing the VPN with hotspot clients
+        col.addView(section(c, "Раздача"));
+        LinearLayout sh = Ui.card(c);
+        sh.addView(switchRow(c, "VPN для точки доступа", "Прокси для устройств, подключённых к телефону", prefs.shareProxy(), new Toggle() {
+            @Override public void set(boolean v) {
+                prefs.shareProxy(v);
+                renderShare();
+                reconnect();
+            }
+        }));
+        shareInfo = Ui.text(c, "", 13, Ui.MUTED, false);
+        shareInfo.setTextIsSelectable(true);
+        sh.addView(shareInfo, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+        shareButtons = Ui.row(c);
+        TextView shCopy = Ui.button(c, "Скопировать", false);
+        shCopy.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                cb.setPrimaryClip(ClipData.newPlainText("proxy", shareText()));
+                Toast.makeText(SettingsActivity.this, "Скопировано", Toast.LENGTH_SHORT).show();
+            }
+        });
+        TextView shReset = Ui.button(c, "Новый пароль", false);
+        shReset.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                prefs.resetShareCreds();
+                renderShare();
+                reconnect();
+            }
+        });
+        shareButtons.addView(shCopy, Ui.weight());
+        View gap = new View(c);
+        shareButtons.addView(gap, new LinearLayout.LayoutParams(Ui.dp(c, 8), 1));
+        shareButtons.addView(shReset, Ui.weight());
+        sh.addView(shareButtons, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 12));
+        col.addView(sh, Ui.lp(c, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 8));
+        renderShare();
+
         // Main screen builder
         col.addView(section(c, "Внешний вид"));
         LinearLayout home = Ui.card(c);
@@ -259,6 +297,7 @@ public class SettingsActivity extends Activity {
         super.onResume();
         int n = prefs.excludedApps().size();
         if (appsCount != null) appsCount.setText(n == 0 ? "Все приложения идут через VPN" : "Напрямую: " + n);
+        renderShare();
         updHandler.post(updTicker);
     }
 
@@ -372,6 +411,32 @@ public class SettingsActivity extends Activity {
         prefs.resetSubUpdated();
         renderSubs();
         reconnect();
+    }
+
+    private TextView shareInfo;
+    private LinearLayout shareButtons;
+
+    private String shareText() {
+        java.util.List<String> ips = ShareInfo.list();
+        String host = ips.isEmpty() ? "<адрес телефона>" : ips.get(0);
+        return "Прокси (SOCKS5 или HTTP): " + host + ":" + Prefs.SHARE_PORT
+                + "\nЛогин: " + prefs.shareUser() + "\nПароль: " + prefs.sharePass();
+    }
+
+    private void renderShare() {
+        if (shareInfo == null) return;
+        boolean on = prefs.shareProxy();
+        shareButtons.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (!on) {
+            shareInfo.setText("Android не пускает трафик точки доступа в VPN без root. "
+                    + "Поэтому Dash поднимает прокси: на подключённом устройстве его нужно указать в настройках Wi-Fi.");
+            return;
+        }
+        String where = ShareInfo.list().isEmpty()
+                ? "Включите точку доступа — здесь появится адрес.\n\n" : "";
+        shareInfo.setText(where + shareText()
+                + "\n\nНа устройстве: Wi-Fi → эта сеть → Прокси → Вручную, адрес и порт выше. "
+                + "Логин и пароль спросит браузер. UDP (игры, звонки) работает только через SOCKS5.");
     }
 
     private interface Toggle { void set(boolean v); }
