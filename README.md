@@ -1,5 +1,3 @@
-<img width="1080" height="2198" alt="Screenshot_20261010_152640_Dash" src="https://github.com/user-attachments/assets/5822f09a-3791-4c04-9469-049eaeb4741b" />
-<img width="1080" height="2158" alt="Screenshot_20261010_152653_Dash" src="https://github.com/user-attachments/assets/65a82c44-9d99-4f0b-820e-3b90e8554db9" />
 # Dash
 
 VPN-клиент для Android и Windows на ядрах sing-box и Xray. Вставил ссылку подписки — нажал одну кнопку.
