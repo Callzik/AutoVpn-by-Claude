@@ -2,6 +2,11 @@
 
 VPN-клиент для Android и Windows на ядрах sing-box и Xray. Вставил ссылку подписки — нажал одну кнопку.
 
+<p align="center">
+  <img src="docs/off.jpg" width="250" alt="Dash: отключено">
+  <img src="docs/on.jpg" width="250" alt="Dash: подключено">
+</p>
+
 ## Возможности
 
 - **Без списка серверов.** Dash сам выбирает самый быстрый.
@@ -49,3 +54,5 @@ cd windows && go test ./...
 Оба прогоняют [`testdata/sub-cases.json`](testdata/sub-cases.json), чтобы парсеры подписок на Android и Windows не расходились.
 
 ---
+
+Создано с помощью Claude (Anthropic).
