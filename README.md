@@ -21,22 +21,6 @@ Versions of the cores and the toolchain are pinned in [`versions.env`](versions.
 - Tests: `scripts/test-android.sh` and `cd windows && go test ./...` both run [`testdata/sub-cases.json`](testdata/sub-cases.json), so the two subscription parsers stay in sync.
 - CI signs the APK with the release key from the `DASH_KEYSTORE_B64` / `DASH_KS_PASS` / `DASH_KS_ALIAS` secrets; without them it uses a throwaway key (`-test-key` APK, won't install over a release).
 
-## О проекте
-
-Проект создан с помощью Claude (Anthropic), ИИ-ассистента: код, сборка и отладка выполнены в диалоге с ним.
-
-## Скачать
-
-Готовый APK (arm64) — в [Releases](https://github.com/Callzik/DashVPN-by-Claude/releases) (тег `android-v…`), там же SHA-256. Разреши установку из неизвестных источников и вставь ссылку подписки.
-
-Серверы с транспортом xhttp идут через встроенное ядро [Xray-core](https://github.com/XTLS/Xray-core) (официальный релиз v26.9.30, лицензия MPL-2.0, файл `lib/arm64-v8a/libxray.so`), остальные — через sing-box.
-
-
-## Windows
-
-Готовая сборка — в [Releases](https://github.com/Callzik/DashVPN-by-Claude/releases) (тег `windows-v…`): распакуйте и запустите `Dash.exe` (нужны права администратора для VPN-адаптера, Windows 10/11 x64).
-То же, что на телефоне: одна кнопка, автовыбор сервера, несколько подписок, список серверов с пингом, ручной выбор и отключение серверов, xhttp через Xray, российские сайты напрямую. Весь трафик ПК идёт через TUN-адаптер.
-Исходники — в папке [`windows/`](windows/) (Go + WebView2, ядра sing-box и Xray-core — официальные сборки).
 
 ## Выпуск релиза
 
