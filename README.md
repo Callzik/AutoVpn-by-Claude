@@ -49,5 +49,3 @@ cd windows && go test ./...
 Оба прогоняют [`testdata/sub-cases.json`](testdata/sub-cases.json), чтобы парсеры подписок на Android и Windows не расходились.
 
 ---
-
-Создано с помощью Claude (Anthropic).
